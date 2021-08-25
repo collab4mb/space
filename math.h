@@ -374,18 +374,6 @@ static Mat4 perspective4x4(float fov, float aspect, float near, float far) {
     res.nums[3][2] = -f_range * near;
     return res;
 }
-// static inline Mat4 perspective4x4(float fov, float aspect, float near, float far) {
-//     float cotangent = 1.0f / tanf(fov * 0.5);
-// 
-//     Mat4 res = {0};
-//     res.nums[0][0] = cotangent / aspect;
-//     res.nums[1][1] = cotangent;
-//     res.nums[2][3] = -1.0f;
-//     res.nums[2][2] = (near + far) / (near - far);
-//     res.nums[3][2] = (2.0f * near * far) / (near - far);
-//     res.nums[3][3] = 0.0f;
-//     return res;
-// }
 
 static Mat4 look_at4x4(Vec3 eye, Vec3 focus, Vec3 up) {
     Vec3 eye_dir = sub3(focus, eye);
