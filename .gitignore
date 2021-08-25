@@ -11,3 +11,6 @@ build/*
 
 # shader compiler output
 *.glsl
+
+# testing main file
+test_main.c
