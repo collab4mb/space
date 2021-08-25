@@ -38,7 +38,7 @@ typedef union {
 }Quaternion;
 
 //Utillity
-float toRadians(float Degrees);
+float to_radians(float Degrees);
 float lerp(float a, float b, float t);
 float fabsf(float f);
 float sign(float f);
