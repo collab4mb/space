@@ -110,7 +110,7 @@ void init(void) {
     },
     .shader = shd,
     .index_type = SG_INDEXTYPE_UINT16,
-    .cull_mode = SG_CULLMODE_BACK,
+    // .cull_mode = SG_CULLMODE_BACK,
     .depth = {
       .write_enabled = true,
       .compare = SG_COMPAREFUNC_LESS_EQUAL,
@@ -132,12 +132,12 @@ void frame(void) {
   vs_params_t vs_params;
   const float w = sapp_widthf();
   const float h = sapp_heightf();
-  Mat4 proj = perspective4x4(60.0f, w/h, 0.01f, 10.0f);
+  Mat4 proj = perspective4x4(1.047f, w/h, 0.01f, 10.0f);
   Mat4 view = look_at4x4(vec3(0.0f, 1.5f, 6.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
   Mat4 view_proj = mul4x4(proj, view);
-  state.rx += 1.0f; state.ry += 2.0f;
-  Mat4 rxm = rotate4x4(vec3(1.0f, 0.0f, 0.0f),state.rx);
-  Mat4 rym = rotate4x4(vec3(0.0f, 1.0f, 0.0f),state.ry);
+  state.rx += 0.01f; state.ry += 0.02f;
+  Mat4 rxm = rotate4x4(vec3(1.0f, 0.0f, 0.0f), state.rx);
+  Mat4 rym = rotate4x4(vec3(0.0f, 1.0f, 0.0f), state.ry);
   Mat4 model = mul4x4(rxm, rym);
   vs_params.mvp = mul4x4(view_proj, model);
 
