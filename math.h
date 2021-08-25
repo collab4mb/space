@@ -38,7 +38,7 @@ typedef union {
 }Quaternion;
 
 //Utillity
-float to_radians(float Degrees);
+float to_radians(float degrees);
 float lerp(float a, float b, float t);
 float fabsf(float f);
 float sign(float f);
@@ -120,10 +120,10 @@ Mat4 look_at4x4(Vec3 eye, Vec3 focus, Vec3 up);
 #ifndef MATH_IMPLEMENTATION_ONCE
 #define MATH_IMPLEMENTATION_ONCE
 
-float toRadians(float Degrees) {
-   float Result = Degrees * (PI_f / 180.0f);
+float to_radians(float degrees) {
+   float result = degrees * (PI_f / 180.0f);
 
-   return (Result);
+   return (result);
 }
 
 float lerp(float a, float b, float t) {
