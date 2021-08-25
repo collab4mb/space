@@ -35,7 +35,7 @@ typedef union {
         float w;
     };
     float elements[4];
-}Quaternion;
+} Quaternion;
 
 //Utillity
 float to_radians(float degrees);
