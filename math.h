@@ -88,9 +88,11 @@ float lerp(float a, float b, float t) {
    return (1.0f-t)*a+t*b;
 }
 
+#ifndef _MSC_VER
 float fabsf(float f) {
     return (f < 0.0f) ? -f : f;
 }
+#endif
 
 float sign(float f) {
     if (f > 0.0) return -1.0f;
@@ -360,18 +362,18 @@ static Mat4 rotate4x4(Vec3 axis, float angle) {
 /* equivalent to XMMatrixPerspectiveFovLH
    https://docs.microsoft.com/en-us/windows/win32/api/directxmath/nf-directxmath-xmmatrixperspectivefovlh
 */
-static Mat4 perspective4x4(float fov, float aspect, float near, float far) {
+static Mat4 perspective4x4(float fov, float aspect, float n, float f) {
     fov *= 0.5f;
     float height = cosf(fov) / sinf(fov);
     float width = height / aspect;
-    float f_range = far / (far - near);
+    float f_range = f / (f - n);
 
     Mat4 res = {0};
     res.nums[0][0] = width;
     res.nums[1][1] = height;
     res.nums[2][3] = 1.0f;
     res.nums[2][2] = f_range;
-    res.nums[3][2] = -f_range * near;
+    res.nums[3][2] = -f_range * n;
     return res;
 }
 // static inline Mat4 perspective4x4(float fov, float aspect, float near, float far) {
