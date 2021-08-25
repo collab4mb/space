@@ -1,13 +1,3 @@
 *.swp
 *.swo
 build/*
-
-# windows compiler output
-*.exe
-*.obj
-*.pdb
-*.ilk
-*.exp
-
-# shader compiler output
-*.glsl
