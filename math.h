@@ -1,31 +1,225 @@
+#ifndef _MATH_H_
+
+#define _MATH_H_
+
 #define m_min(a, b)            ((a) < (b) ? (a) : (b))
 #define m_max(a, b)            ((a) > (b) ? (a) : (b))
-#define clamp(x, a, b)         m_min(b, m_max(a, x))
+#define m_abs(a, b)            ((a) >  0  ? (a) : -(a))
+#define m_mod(a, m)            (((a) % (m)) >= 0 ? ((a) % (m)) : (((a) % (m)) + (m)))
+#define m_clamp(x, a, b)       (m_min(b, m_max(a, x)))
+#define m_square(a)            ((a)*(a))
+//#define INFINITY (*(float *)&positive_inf)
 
-#define sat_i8(x) (int8_t) clamp((x), -128, 127)
+#define sat_i8(x) (int8_t) (m_clamp((x), -128, 127))
 
 #define PI_f (3.14159265359f)
 
-const uint32_t positive_inf = 0x7F800000; // 0xFF << 23
-#define INFINITY (*(float *)&positive_inf)
+typedef struct { float x, y; } Vec2;
+typedef struct { float x, y, z; } Vec3;
+typedef struct { float x, y, z, w; } Vec4;
+typedef union {
+    float nums[4][4];
+    struct { Vec4 x, y, z, w; };
+    Vec4 cols[4];
+} Mat4;
+typedef union {
+    struct {
+        union { Vec3 xyz; struct { float x,y,z; }; };
+        float w;
+    };
+    float elements[4];
+}Quaternion;
 
-static float fabsf(float f) {
+//Utillity
+float toRadians(float Degrees);
+float lerp(float a, float b, float t);
+float fabsf(float f);
+float sign(float f);
+float step(float edge, float x);
+
+//Vector operations
+Vec2 vec2(float x, float y);
+Vec3 vec3(float x, float y, float z);
+Vec4 vec4(float x, float y, float z, float w);
+Vec2 add2(Vec2 a, Vec2 b);
+Vec3 add3(Vec3 a, Vec3 b);
+Vec4 add4(Vec4 a, Vec4 b);
+Vec2 sub2(Vec2 a, Vec2 b);
+Vec3 sub3(Vec3 a, Vec3 b);
+Vec4 sub4(Vec4 a, Vec4 b);
+Vec2 add2_f(Vec2 a, float f);
+Vec3 add3_f(Vec3 a, float f);
+Vec4 add4_f(Vec4 a, float f);
+Vec2 sub2_f(Vec2 a, float f);
+Vec3 sub3_f(Vec3 a, float f);
+Vec4 sub4_f(Vec4 a, float f);
+Vec2 div2_f(Vec2 a, float f);
+Vec3 div3_f(Vec3 a, float f);
+Vec4 div4_f(Vec4 a, float f);
+float dot2(Vec2 a, Vec2 b);
+float dot3(Vec3 a, Vec3 b);
+float dot4(Vec4 a, Vec4 b);
+float mag2(Vec2 a);
+float mag3(Vec3 a);
+float mag4(Vec4 a);
+float magmag2(Vec2 a);
+float magmag3(Vec3 a);
+float magmag4(Vec4 a);
+Vec2 norm2(Vec2 a);
+Vec3 norm3(Vec3 a);
+Vec4 norm4(Vec4 a);
+
+//Uncomment to use in true single header style
+#define MATH_IMPLEMENTATION
+
+#ifdef MATH_IMPLEMENTATION
+#ifndef MATH_IMPLEMENTATION_ONCE
+#define MATH_IMPLEMENTATION_ONCE
+
+const uint32_t positive_inf = 0x7F800000; // 0xFF << 23
+
+float toRadians(float Degrees) {
+   float Result = Degrees * (PI_f / 180.0f);
+
+   return (Result);
+}
+
+float lerp(float a, float b, float t) {
+   return (1.0f-t)*a+t*b;
+}
+
+float fabsf(float f) {
     return (f < 0.0f) ? -f : f;
 }
 
-static float sign(float f) {
+float sign(float f) {
     if (f > 0.0) return -1.0f;
     if (f < 0.0) return  1.0f;
     else         return  0.0f;
 }
 
-static float step(float edge, float x) {
+float step(float edge, float x) {
     return (x < edge) ? 0.0f : 1.0f;
 }
 
-typedef struct { float x, y; } Vec2;
-static Vec2 vec2(float x, float y) {
+Vec2 vec2(float x, float y) {
     return (Vec2) { x, y };
+}
+
+Vec3 vec3(float x, float y, float z) {
+    return (Vec3) { x, y, z };
+}
+
+Vec4 vec4(float x, float y, float z, float w) {
+    return (Vec4) { x, y, z, w};
+}
+
+Vec2 add2(Vec2 a, Vec2 b) {
+   return vec2(a.x+b.x,a.y+b.y);
+}
+
+Vec3 add3(Vec3 a, Vec3 b) {
+   return vec3(a.x+b.x,a.y+b.y,a.z+b.z);
+}
+
+Vec4 add4(Vec4 a, Vec4 b) {
+   return vec4(a.x+b.x,a.y+b.y,a.z+b.z,a.w+b.w);
+}
+
+Vec2 sub2(Vec2 a, Vec2 b) {
+   return vec2(a.x-b.x,a.y-b.y);
+}
+
+Vec3 sub3(Vec3 a, Vec3 b) {
+   return vec3(a.x-b.x,a.y-b.y,a.z-b.z);
+}
+
+Vec4 sub4(Vec4 a, Vec4 b) {
+   return vec4(a.x-b.x,a.y-b.y,a.z-b.z,a.w-b.w);
+}
+
+Vec2 add2_f(Vec2 a, float f) {
+   return vec2(a.x+f,a.y+f);
+}
+
+Vec3 add3_f(Vec3 a, float f) {
+   return vec3(a.x+f,a.y+f,a.z+f);
+}
+
+Vec4 add4_f(Vec4 a, float f) {
+   return vec4(a.x+f,a.y+f,a.z+f,a.w+f);
+}
+
+Vec2 sub2_f(Vec2 a, float f) {
+   return vec2(a.x-f,a.y-f);
+}
+
+Vec3 sub3_f(Vec3 a, float f) {
+   return vec3(a.x-f,a.y-f,a.z-f);
+}
+
+Vec4 sub4_f(Vec4 a, float f) {
+   return vec4(a.x-f,a.y-f,a.z-f,a.w-f);
+}
+
+Vec2 div2_f(Vec2 a, float f) {
+   return vec2(a.x/f,a.y/f);
+}
+
+Vec3 div3_f(Vec3 a, float f) {
+   return vec3(a.x/f,a.y/f,a.z/f);
+}
+
+Vec4 div4_f(Vec4 a, float f) {
+   return vec4(a.x/f,a.y/f,a.z/f,a.w/f);
+}
+
+float dot2(Vec2 a, Vec2 b) {
+   return a.x*b.x+a.y*b.y;
+}
+
+float dot3(Vec3 a, Vec3 b) {
+   return a.x*b.x+a.y*b.y+a.z*b.z;
+}
+
+float dot4(Vec4 a, Vec4 b) {
+   return a.x*b.x+a.y*b.y+a.z*b.z+a.w*b.w;
+}
+
+float mag2(Vec2 a) {
+    return sqrtf(dot2(a, a));
+}
+
+float mag3(Vec3 a) {
+    return sqrtf(dot3(a, a));
+}
+
+float mag4(Vec4 a) {
+    return sqrtf(dot4(a, a));
+}
+
+float magmag2(Vec2 a) {
+    return dot2(a, a);
+}
+
+float magmag3(Vec3 a) {
+    return dot3(a, a);
+}
+
+float magmag4(Vec4 a) {
+    return dot4(a, a);
+}
+
+Vec2 norm2(Vec2 a) {
+    return div2_f(a, mag2(a));
+}
+
+Vec3 norm3(Vec3 a) {
+    return div3_f(a, mag3(a));
+}
+
+Vec4 norm4(Vec4 a) {
+    return div4_f(a, mag4(a));
 }
 
 static Vec2 vec2_rot(float rot) {
@@ -36,29 +230,9 @@ static float rot_vec2(Vec2 rot) {
     return atan2f(rot.y, rot.x);
 }
 
-static Vec2 add2(Vec2 a, Vec2 b) {
-    return vec2(a.x + b.x,
-                a.y + b.y);
-}
-
-static Vec2 sub2(Vec2 a, Vec2 b) {
-    return vec2(a.x - b.x,
-                a.y - b.y);
-}
-
-static Vec2 sub2_f(Vec2 v, float f) {
-    return vec2(v.x - f,
-                v.y - f);
-}
-
 static Vec2 div2(Vec2 a, Vec2 b) {
     return vec2(a.x / b.x,
                 a.y / b.y);
-}
-
-static Vec2 div2_f(Vec2 a, float f) {
-    return vec2(a.x / f,
-                a.y / f);
 }
 
 static Vec2 mul2(Vec2 a, Vec2 b) {
@@ -71,61 +245,16 @@ static Vec2 mul2_f(Vec2 a, float f) {
                 a.y * f);
 }
 
-static float dot2(Vec2 a, Vec2 b) {
-    return a.x*b.x + a.y*b.y;
-}
-
-static float mag2(Vec2 a) {
-    return sqrtf(dot2(a, a));
-}
-
-static float magmag2(Vec2 a) {
-    return dot2(a, a);
-}
-
-static Vec2 norm2(Vec2 a) {
-    return div2_f(a, mag2(a));
-}
-
-
-typedef struct { float x, y, z; } Vec3;
 #define vec3_f(f) ((Vec3) { f, f, f })
 #define vec3_x ((Vec3) { 1.0f, 0.0f, 0.0f })
 #define vec3_y ((Vec3) { 0.0f, 1.0f, 0.0f })
 #define vec3_z ((Vec3) { 0.0f, 0.0f, 1.0f })
 
-static Vec3 vec3(float x, float y, float z) {
-    return (Vec3) { x, y, z };
-}
-
-static Vec3 add3(Vec3 a, Vec3 b) {
-    return vec3(a.x + b.x,
-                a.y + b.y,
-                a.z + b.z);
-}
-
-static Vec3 add3_f(Vec3 a, float f) {
-    return vec3(a.x + f,
-                a.y + f,
-                a.z + f);
-}
-
-static Vec3 sub3(Vec3 a, Vec3 b) {
-    return vec3(a.x - b.x,
-                a.y - b.y,
-                a.z - b.z);
-}
 
 static Vec3 div3(Vec3 a, Vec3 b) {
     return vec3(a.x / b.x,
                 a.y / b.y,
                 a.z / b.z);
-}
-
-static Vec3 div3_f(Vec3 a, float f) {
-    return vec3(a.x / f,
-                a.y / f,
-                a.z / f);
 }
 
 static Vec3 mul3(Vec3 a, Vec3 b) {
@@ -161,35 +290,11 @@ static Vec3 lerp3(Vec3 a, Vec3 b, float t) {
     return add3(mul3_f(a, 1.0f - t), mul3_f(b, t));
 }
 
-static float dot3(Vec3 a, Vec3 b) {
-    return a.x*b.x + a.y*b.y + a.z*b.z;
-}
-
 static Vec3 cross3(Vec3 a, Vec3 b) {
     return vec3((a.y * b.z) - (a.z * b.y),
                 (a.z * b.x) - (a.x * b.z),
                 (a.x * b.y) - (a.y * b.x));
 }
-
-static float mag3(Vec3 a) {
-    return sqrtf(dot3(a, a));
-}
-
-static float magmag3(Vec3 a) {
-    return dot3(a, a);
-}
-
-static Vec3 norm3(Vec3 a) {
-    return div3_f(a, mag3(a));
-}
-
-
-typedef struct { float x, y, z, w; } Vec4;
-typedef union {
-    float nums[4][4];
-    struct { Vec4 x, y, z, w; };
-    Vec4 cols[4];
-} Mat4;
 
 static Mat4 mul4x4(Mat4 a, Mat4 b) {
     Mat4 out = {0};
@@ -290,3 +395,7 @@ static Mat4 look_at4x4(Vec3 eye, Vec3 focus, Vec3 up) {
         {   D0,   D1,   D2, 1.0f }
     }};
 }
+
+#endif
+#endif
+#endif
