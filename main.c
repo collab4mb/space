@@ -44,6 +44,7 @@ typedef struct {
   uint64_t props[(EntProp_COUNT + 63) / 64];
   Vec2 pos;
   Art art;
+  float angle;
 } Ent;
 static inline bool has_ent_prop(Ent *ent, EntProp prop) {
   return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
@@ -65,6 +66,7 @@ typedef struct {
   sg_pipeline pip;
   sg_bindings bind;
   Ent ents[STATE_MAX_ENTS];
+  Ent *player;
 } State;
 static State *state;
 
@@ -102,7 +104,7 @@ static inline Ent *ent_all_iter(Ent *ent) {
 void init(void) {
   state = calloc(sizeof(State), 1);
 
-  add_ent((Ent) { .art = Art_Ship, .pos = {  0,  2.5 } });
+  state->player = add_ent((Ent) { .art = Art_Ship, .pos = {  0,  2.5 } });
   add_ent((Ent) { .art = Art_Cube, .pos = {  2, -3.0 } });
   add_ent((Ent) { .art = Art_Cube, .pos = {  5, -2.0 } });
   add_ent((Ent) { .art = Art_Cube, .pos = { -3, -4.0 } });
@@ -211,10 +213,30 @@ static void draw_cube(Mat4 vp, Mat4 model) {
 }
 
 static void frame(void) {
+  //Player input
+  if(input_key_down(SAPP_KEYCODE_LEFT))
+    state->player->angle-=0.05f;
+  if(input_key_down(SAPP_KEYCODE_RIGHT))
+    state->player->angle+=0.05f;
+  Vec2 p_dir = vec2_rot(state->player->angle);
+  float t = p_dir.x;
+  p_dir.x = p_dir.y;
+  p_dir.y = t;
+  if(input_key_down(SAPP_KEYCODE_UP))
+  {
+    state->player->pos.x+=p_dir.x*0.2f;
+    state->player->pos.y+=p_dir.y*0.2f;
+  }
+  if(input_key_down(SAPP_KEYCODE_DOWN))
+  {
+    state->player->pos.x-=p_dir.x*0.2f;
+    state->player->pos.y-=p_dir.y*0.2f;
+  }
+
   const float w = sapp_widthf();
   const float h = sapp_heightf();
   Mat4 proj = perspective4x4(1.047f, w/h, 0.01f, 50.0f);
-  Mat4 view = look_at4x4(vec3(0.0f, 3.5f, 6.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+  Mat4 view = look_at4x4(vec3(state->player->pos.x-p_dir.x*5.0f, 4.0f,state->player->pos.y-p_dir.y*5.0f), vec3(state->player->pos.x, 0.0f, state->player->pos.y), vec3(0.0f, 1.0f, 0.0f));
   Mat4 vp = mul4x4(proj, view);
 
   sg_pass_action pass_action = {
@@ -234,14 +256,18 @@ static void frame(void) {
       case Art_Ship: {
         Mat4 m = translate4x4(vec3(ent->pos.x, 0.0f, ent->pos.y));
         m = mul4x4(m, scale4x4(vec3(1.0f, 0.3f, 1.0f)));
-        m = mul4x4(m, rotate4x4(vec3_y, 0.78f));
+        m = mul4x4(m, rotate4x4(vec3_y, ent->angle));
         draw_cube(vp, m);
-        m = translate4x4(vec3(ent->pos.x+0.35, 0.0f, ent->pos.y));
+        /*m = translate4x4(vec3(0.35, 0.0f, 0.0f));
+        m = mul4x4(m, rotate4x4(vec3_y, ent->angle));
+        m = mul4x4(m, translate4x4(vec3(ent->pos.x,0.0f,ent->pos.y)));
         m = mul4x4(m, scale4x4(vec3(0.2f, 0.4f, 1.4f)));
         draw_cube(vp, m);
-        m = translate4x4(vec3(ent->pos.x-0.35, 0.0f, ent->pos.y));
+        m = translate4x4(vec3(-0.35, 0.0f, 0.0f));
+        m = mul4x4(m, rotate4x4(vec3_y, ent->angle));
+        m = mul4x4(m, translate4x4(vec3(ent->pos.x,0.0f,ent->pos.y)));
         m = mul4x4(m, scale4x4(vec3(0.2f, 0.4f, 1.4f)));
-        draw_cube(vp, m);
+        draw_cube(vp, m);*/
       } break;
     }
   }
