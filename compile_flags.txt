@@ -1,1 +1,2 @@
 -xc
+-include main.c
