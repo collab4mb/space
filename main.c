@@ -19,6 +19,8 @@
 #include <math.h>
 #include "math.h"
 
+#include "input.h"
+
 #include "build/shaders.glsl.h"
 
 /* EntProps enable codepaths for game entities.
@@ -245,6 +247,8 @@ static void frame(void) {
   }
   sg_end_pass();
   sg_commit();
+
+  input_update();
 }
 
 static void cleanup(void) {
@@ -254,10 +258,20 @@ static void cleanup(void) {
 static void event(const sapp_event *ev) {
   switch (ev->type) {
     case SAPP_EVENTTYPE_KEY_DOWN: {
+        input_key_update(ev->key_code,1);
       #ifndef NDEBUG
         if (ev->key_code == SAPP_KEYCODE_ESCAPE)
           sapp_request_quit();
       #endif
+    } break;
+    case SAPP_EVENTTYPE_KEY_UP: {
+        input_key_update(ev->key_code,0);
+    } break;
+    case SAPP_EVENTTYPE_MOUSE_DOWN: {
+        input_mouse_update(ev->mouse_button,1);
+    } break;
+    case SAPP_EVENTTYPE_MOUSE_UP: {
+        input_mouse_update(ev->mouse_button,0);
     } break;
   }
 }
