@@ -157,14 +157,14 @@ void init(void) {
   state->player->size = 2.0f;
   state->player->wheight = 1.0f;
   Ent *te = add_ent((Ent) { .art = Art_Asteroid, .pos = {  2, -3.0 } });
-  te->size = 2.0f;
-  te->wheight = 0.1f;
+  te->size = 1.0f;
+  te->wheight = 0.2f;
   te = add_ent((Ent) { .art = Art_Asteroid, .pos = {  5, -2.0 } });
-  te->size = 2.0f;
-  te->wheight = 0.1f;
+  te->size = 1.0f;
+  te->wheight = 0.2f;
   te = add_ent((Ent) { .art = Art_Asteroid, .pos = { -3, -4.0 } });
-  te->size = 2.0f;
-  te->wheight = 0.1f;
+  te->size = 1.0f;
+  te->wheight = 0.2f;
 
 
   sg_setup(&(sg_desc){
