@@ -13,6 +13,8 @@
 
 #define SOKOL_WIN32_FORCE_MAIN
 #include "sokol/sokol_app.h"
+#define CUTE_PNG_IMPLEMENTATION
+#include "cute_png.h"
 #include "sokol/sokol_gfx.h"
 #include "sokol/sokol_glue.h"
 
@@ -24,6 +26,7 @@
 #include "input.h"
 
 #include "build/shaders.glsl.h"
+#include "overlay.h"
 
 /* EntProps enable codepaths for game entities.
    These aren't boolean fields because that makes it more difficult to deal with
@@ -74,6 +77,7 @@ typedef struct {
   Art art;
 
   float size, weight;
+  float scale_delta;
 } Ent;
 static inline bool has_ent_prop(Ent *ent, EntProp prop) {
   return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
@@ -136,11 +140,12 @@ static inline Ent *ent_all_iter(Ent *ent) {
 
 static struct {
   sg_buffer ibuf, vbuf;
+  sg_image texture;
   size_t id;
   size_t index_count;
 } meshes[Art_COUNT] = { 0 };
 
-void load_mesh(const char *path, Art art) {
+void load_mesh(const char *path, const char *texture, Art art) {
   char *input = fio_read_text(path);
   if (input == NULL) {
     fprintf(stderr, "Could not load asset %s, file inaccessible\n", path);
@@ -162,7 +167,17 @@ void load_mesh(const char *path, Art art) {
     .type = SG_BUFFERTYPE_INDEXBUFFER,
     .data = (sg_range){unrolled.indices, res.index_count*sizeof(uint16_t)},
   });
+
+
+  cp_image_t player_png = cp_load_png(texture);
+  cp_flip_image_horizontal(&player_png);
   state->bind.index_buffer = ibuf;
+  meshes[art].texture = sg_make_image(&(sg_image_desc){
+    .width = player_png.w,
+    .height = player_png.h,
+    .data.subimage[0][0] = (sg_range){ player_png.pix,player_png.w*player_png.h*sizeof(cp_pixel_t) } ,
+  });
+  cp_free_png(&player_png);
   meshes[art].ibuf = ibuf; meshes[art].vbuf = vbuf; 
   meshes[art].id = art; meshes[art].index_count = res.index_count;
   obj_dispose_unrolled(&unrolled);
@@ -198,6 +213,7 @@ void init(void) {
       Ent *ast = add_ent((Ent) {
         .art = Art_Asteroid,
         .pos = mul2_f(vec2_rot(t), dist),
+        .scale_delta = -r * (0.1f + 0.2f * randf()),
         .size = 1.0f,
         .weight = 1.0f,
       });
@@ -209,12 +225,15 @@ void init(void) {
     .context = sapp_sgcontext()
   });
 
-  load_mesh("./Bob.obj", Art_Ship);
-  load_mesh("./Asteroid.obj", Art_Asteroid);
+
+  load_mesh("./Bob.obj", "./Bob_Orange.png", Art_Ship);
+  load_mesh("./Asteroid.obj", "./Moon.png", Art_Asteroid);
  
 
-  /* a shader (use separate shader sources here */
-  sg_shader shd = sg_make_shader(cube_shader_desc(sg_query_backend()));
+  /* a shader use separate shader sources here */
+  sg_shader shd = sg_make_shader(mesh_shader_desc(sg_query_backend()));
+
+  ol_init();
 
   /* a pipeline state object */
   state->pip = sg_make_pipeline(&(sg_pipeline_desc){
@@ -233,14 +252,14 @@ void init(void) {
       .compare = SG_COMPAREFUNC_LESS_EQUAL,
     },
   }); 
-
 }
 
 static void draw_mesh(Mat4 vp, Mat4 model, Art art) {
+  state->bind.fs_images[SLOT_tex] = meshes[art].texture;
   state->bind.index_buffer = meshes[art].ibuf;
   state->bind.vertex_buffers[0] = meshes[art].vbuf;
   sg_apply_bindings(&state->bind);
-  vs_params_t vs_params = { .mvp = mul4x4(vp, model) };
+  vs_params_t vs_params = { .mvp = mul4x4(vp, model), .model = model };
   sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_vs_params, &SG_RANGE(vs_params));
   sg_draw(0, meshes[art].index_count, 1);
 }
@@ -289,9 +308,26 @@ static void frame(void) {
       m = mul4x4(m, rotate4x4(ent->passive_rotate_axis,
                               ent->passive_rotate_angle += 0.01));
 
-    m = mul4x4(m, art_tweaks[ent->art]);
+    m = mul4x4(m, scale4x4(vec3_f(1.0f+ent->scale_delta)));
+
+    // m = mul4x4(m, art_tweaks[ent->art]);
     draw_mesh(vp, m, ent->art);
   }
+
+  ol_begin();
+  char *txt = 
+    "..#..#.."
+    "..#..#.."
+    "..#..#.."
+    "#......#"
+    ".######.";
+  
+  size_t l = strlen(txt);
+
+  for (size_t i = 0; i < l; i += 1)
+    if (txt[i] == '#')
+      ol_draw_rect(vec4(1.0, i/(float)l, 0.0, 1.0), (i%8)*10, (i/8)*10, 10, 10);
+
   sg_end_pass();
   sg_commit();
 
