@@ -38,7 +38,7 @@ typedef enum {
   EntProp_COUNT,
 } EntProp;
 
-typedef enum { Art_Ship, Art_Asteroid } Art;
+typedef enum { Art_Ship, Art_Asteroid, Art_COUNT } Art;
 
 /* A game entity. Usually, it is rendered somewhere and has some sort of dynamic behavior */
 typedef struct {
@@ -106,7 +106,7 @@ static struct {
   sg_buffer ibuf, vbuf;
   size_t id;
   size_t index_count;
-} meshes[32] = { 0 };
+} meshes[Art_COUNT] = { 0 };
 
 void load_mesh(const char *path, Art art) {
   char *input = fio_read_text(path);
