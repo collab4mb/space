@@ -2,8 +2,5 @@
 *.swo
 build/*
 
-# shader compiler output
-*.glsl.h
-
 # testing main file
 test_main.c
