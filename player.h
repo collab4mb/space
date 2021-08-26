@@ -26,22 +26,7 @@ static void player_update(Ent *player) {
     if(magmag2(player->vel)>MAX_SPEED2)
       player->vel = mul2_f(norm2(player->vel),0.4f);
   }
-  else {
-    //Decelerate
-    float len = mag2(player->vel);
-    if(len!=0.0f) {
-      player->vel = norm2(player->vel);
-      len-=DECEL;
-      len = len<0.0f?0.0f:len;
-      player->vel = mul2_f(player->vel,len);
-    }
-  }
 
-  player->pos.x+=player->vel.x;
-  player->pos.y+=player->vel.y;
-
-  //Collision
-  collision(player);
 }
 
 #undef MAX_SPEED2

@@ -53,7 +53,9 @@ typedef struct {
   Vec2 dir;
   float angle;
   Art art;
+
   float size;
+  float wheight;
 } Ent;
 static inline bool has_ent_prop(Ent *ent, EntProp prop) {
   return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
@@ -153,9 +155,16 @@ void init(void) {
 
   state->player = add_ent((Ent) { .art = Art_Ship, .pos = {  0,  2.5 } });
   state->player->size = 2.0f;
-  add_ent((Ent) { .art = Art_Asteroid, .pos = {  2, -3.0 } })->size = 2.0f;
-  add_ent((Ent) { .art = Art_Asteroid, .pos = {  5, -2.0 } })->size = 2.0f;
-  add_ent((Ent) { .art = Art_Asteroid, .pos = { -3, -4.0 } })->size = 2.0f;
+  state->player->wheight = 1.0f;
+  Ent *te = add_ent((Ent) { .art = Art_Asteroid, .pos = {  2, -3.0 } });
+  te->size = 2.0f;
+  te->wheight = 0.1f;
+  te = add_ent((Ent) { .art = Art_Asteroid, .pos = {  5, -2.0 } });
+  te->size = 2.0f;
+  te->wheight = 0.1f;
+  te = add_ent((Ent) { .art = Art_Asteroid, .pos = { -3, -4.0 } });
+  te->size = 2.0f;
+  te->wheight = 0.1f;
 
 
   sg_setup(&(sg_desc){
@@ -201,6 +210,10 @@ static void draw_mesh(Mat4 vp, Mat4 model, Art art) {
 
 static void frame(void) {
   player_update(state->player);
+  for (Ent *ent = 0; (ent = ent_all_iter(ent));)
+    collision(ent);
+  for (Ent *ent = 0; (ent = ent_all_iter(ent));)
+    collision_movement_update(ent);
 
   const float w = sapp_widthf();
   const float h = sapp_heightf();
