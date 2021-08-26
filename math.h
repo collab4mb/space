@@ -4,7 +4,7 @@
 
 #define m_min(a, b)            ((a) < (b) ? (a) : (b))
 #define m_max(a, b)            ((a) > (b) ? (a) : (b))
-#define m_abs(a, b)            ((a) >  0  ? (a) : -(a))
+#define m_abs(a)               ((a) >  0  ? (a) : -(a))
 #define m_mod(a, m)            (((a) % (m)) >= 0 ? ((a) % (m)) : (((a) % (m)) + (m)))
 #define m_clamp(x, a, b)       (m_min(b, m_max(a, x)))
 #define m_square(a)            ((a)*(a))

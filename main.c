@@ -43,7 +43,7 @@ typedef enum {
 
 typedef enum { Art_Ship, Art_Asteroid, Art_COUNT } Art;
 /* probably a better way to do this? we'll see */
-Mat4 art_tweaks[Art_COUNT] = {
+static Mat4 art_tweaks[Art_COUNT] = {
   [Art_Ship] = {{
     0.3f, 0.0f, 0.0f, 0.0f,
     0.0f, 0.3f, 0.0f, 0.0f,
@@ -63,12 +63,17 @@ typedef struct {
   /* packed into 64 bit sections for alignment */
   uint64_t props[(EntProp_COUNT + 63) / 64];
 
-  Vec2 pos;
-  Art art;
+  Vec2 pos, vel;
+
   float angle;
 
+  /* tied to EntProp_PassiveRotate */
   Vec3 passive_rotate_axis;
   float passive_rotate_angle;
+
+  Art art;
+
+  float size, weight;
 } Ent;
 static inline bool has_ent_prop(Ent *ent, EntProp prop) {
   return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
@@ -126,6 +131,9 @@ static inline Ent *ent_all_iter(Ent *ent) {
   return NULL;
 }
 
+#include "collision.h"
+#include "player.h"
+
 static struct {
   sg_buffer ibuf, vbuf;
   size_t id;
@@ -168,7 +176,9 @@ void init(void) {
 
   state->player = add_ent((Ent) {
     .art = Art_Ship,
-    .pos = { -1, 2.5 }
+    .pos = { -1, 2.5 },
+    .size = 2.0f,
+    .weight = 0.4f,
   });
   #define ASTEROIDS_PER_RING (7)
   #define ASTEROID_RINGS (3)
@@ -188,6 +198,8 @@ void init(void) {
       Ent *ast = add_ent((Ent) {
         .art = Art_Asteroid,
         .pos = mul2_f(vec2_rot(t), dist),
+        .size = 1.0f,
+        .weight = 1.0f,
       });
       ast->passive_rotate_axis = rand3();
       give_ent_prop(ast, EntProp_PassiveRotate);
@@ -235,25 +247,11 @@ static void draw_mesh(Mat4 vp, Mat4 model, Art art) {
 
 
 static void frame(void) {
-  //Player input
-  float angle_delta = 0;
-  if(input_key_down(SAPP_KEYCODE_LEFT))
-    angle_delta -= 0.05f;
-  if(input_key_down(SAPP_KEYCODE_RIGHT))
-    angle_delta += 0.05f;
-  state->player->angle += angle_delta;
-  state->player_turn_accel += angle_delta;
-  state->player_turn_accel *= 0.8;
-
-  Vec2 p_dir = vec2_swap(vec2_rot(state->player->angle));
-  if (input_key_down(SAPP_KEYCODE_UP)) {
-    state->player->pos.x += p_dir.x*0.2f;
-    state->player->pos.y += p_dir.y*0.2f;
-  }
-  if (input_key_down(SAPP_KEYCODE_DOWN)) {
-    state->player->pos.x -= p_dir.x*0.2f;
-    state->player->pos.y -= p_dir.y*0.2f;
-  }
+  player_update(state->player);
+  for (Ent *ent = 0; (ent = ent_all_iter(ent));)
+    collision(ent);
+  for (Ent *ent = 0; (ent = ent_all_iter(ent));)
+    collision_movement_update(ent);
 
   const float w = sapp_widthf();
   const float h = sapp_heightf();
@@ -270,6 +268,7 @@ static void frame(void) {
     add3(plr_p, mul3(vec3( 5,  0,  5), cam_o)),
     vec3_y
   );
+
   Mat4 vp = mul4x4(proj, view);
 
   sg_pass_action pass_action = {
