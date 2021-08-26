@@ -1,5 +1,5 @@
 #define MAX_SPEED2 (0.4f*0.4f)
-#define ACCEL 0.002f
+#define ACCEL 0.004f
 #define DECEL 0.002f
 
 static void player_update(Ent *player) {
@@ -15,16 +15,16 @@ static void player_update(Ent *player) {
 
   //TODO: this could cause problems on low fps
   if(input_key_down(SAPP_KEYCODE_UP)) {
-    if(magmag2(player->vel)<MAX_SPEED2) {
-      player->vel.x+=player->dir.x*0.002f;
-      player->vel.y+=player->dir.y*0.002f;
-    }
+    player->vel.x+=player->dir.x*ACCEL;
+    player->vel.y+=player->dir.y*ACCEL;
+    if(magmag2(player->vel)>MAX_SPEED2)
+      player->vel = mul2_f(norm2(player->vel),0.4f);
   }
   else if(input_key_down(SAPP_KEYCODE_DOWN)) {
-    if(magmag2(player->vel)<MAX_SPEED2) {
-      player->vel.x-=player->dir.x*ACCEL;
-      player->vel.y-=player->dir.y*ACCEL;
-    }
+    player->vel.x-=player->dir.x*ACCEL;
+    player->vel.y-=player->dir.y*ACCEL;
+    if(magmag2(player->vel)>MAX_SPEED2)
+      player->vel = mul2_f(norm2(player->vel),0.4f);
   }
   else {
     //Decelerate
@@ -39,6 +39,9 @@ static void player_update(Ent *player) {
 
   player->pos.x+=player->vel.x;
   player->pos.y+=player->vel.y;
+
+  //Collision
+  collision(player);
 }
 
 #undef MAX_SPEED2

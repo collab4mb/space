@@ -110,6 +110,7 @@ static inline Ent *ent_all_iter(Ent *ent) {
   return NULL;
 }
 
+#include "collision.h"
 #include "player.h"
 
 static struct {
