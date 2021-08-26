@@ -2,8 +2,7 @@
 #include <stdlib.h>
 
 __attribute__((unused))
-static char* fio_read_text(const char *path)
-{
+static char* fio_read_text(const char *path) {
   FILE *f = fopen(path, "r");
   if (f == NULL)
     return NULL;
@@ -18,8 +17,7 @@ static char* fio_read_text(const char *path)
 }
 
 __attribute__((unused))
-static void fio_write_text(const char *path, const char *text)
-{
+static void fio_write_text(const char *path, const char *text) {
   FILE *f = fopen(path, "w+");
   fputs(text, f);
   fclose(f);

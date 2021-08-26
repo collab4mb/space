@@ -44,6 +44,7 @@ typedef enum { Art_Ship, Art_Asteroid } Art;
 typedef struct {
   /* packed into 64 bit sections for alignment */
   uint64_t props[(EntProp_COUNT + 63) / 64];
+
   Vec2 pos;
   Art art;
 } Ent;

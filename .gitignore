@@ -10,7 +10,7 @@ build/*
 *.exp
 
 # shader compiler output
-*.glsl
+*.glsl.h
 
 # testing main file
 test_main.c
