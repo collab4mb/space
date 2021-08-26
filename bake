@@ -8,4 +8,4 @@ cd build
 
 ../sokol/shdc/linux/sokol-shdc --input ../shaders.glsl --output shaders.glsl.h --slang glsl330
 
-gcc -g ../main.c -lX11 -lXi -lXcursor -lGL -lasound -ldl -lm -lpthread
+gcc -fsanitize=address -g ../main.c -lX11 -lXi -lXcursor -lGL -lasound -ldl -lm -lpthread

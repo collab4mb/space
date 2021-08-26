@@ -17,7 +17,7 @@ typedef struct {
   uint16_t v;  // Vertex idx
   uint16_t vt; // Texture idx
   uint16_t vn; // Normal idx
-} __attribute__((packed)) obj_Triplet;
+} obj_Triplet;
 
 // The result for parsing 
 typedef struct {
@@ -166,6 +166,7 @@ static void _obj_cmd_index(Parser *self, obj_Result *res) {
   assert(!_obj_isint(self) && "Obj: More than 3 indices unsupported, export with \"Triangulate faces\" flag in blender");
 }
 
+__attribute__((unused))
 static void obj_dump(obj_Result *self) {
   printf("-- Vertices --\n");
   for (size_t i = 0; i < self->vertex_count; i += 1) {
@@ -244,11 +245,48 @@ static void obj_dispose(obj_Result *res) {
   free(res->vertices);
 }
 
+static inline bool _obj_triplet_eq(obj_Triplet a, obj_Triplet b) {
+  return a.v == b.v && a.vn == b.vn && a.vt == b.vt;
+}
+
+typedef struct {
+  obj_Triplet chk;
+  size_t index;
+} _obj_MemoNode;
+
+static _obj_MemoNode _obj_memo[1 << 12] = { 0 };
+static inline size_t _obj_memo_insert(obj_Triplet triplet, size_t index) {
+  size_t hash = (triplet.v+triplet.vn*32+triplet.vt*128*(1<<12))&((1 << 12)-1);
+  if (_obj_memo[hash].index == 0) {
+    _obj_memo[hash] = (_obj_MemoNode) { triplet, index+1 };
+  }
+  return index;
+}
+
+static inline size_t _obj_memo_get(obj_Triplet triplet) {
+  size_t hash = (triplet.v+triplet.vn*32+triplet.vt*128*(1<<12))&((1 << 12)-1);
+  if (_obj_memo[hash].index != 0 && _obj_triplet_eq(_obj_memo[hash].chk, triplet))
+    return _obj_memo[hash].index;
+  return 0;
+}
+
 // This function sucks
-static size_t _obj_triplet_pos(obj_Result *res, obj_Triplet triplet) {
-  for (size_t i = 0; i < res->index_count; i += 1)
-    if (memcmp(res->indices + i, &triplet, sizeof(obj_Triplet)) == 0)
-      return i;
+__attribute__((unused))
+static size_t _obj_triplet_pos(obj_Result *res, obj_Triplet triplet, size_t nd) {
+  size_t index = 0;
+  if ((index = _obj_memo_get(triplet))) {
+    return index-1;
+  }
+  for (size_t i = 0; i < nd; i += 1) {
+    for (size_t j = 0; j < i; j += 1)
+      if (_obj_triplet_eq(res->indices[i], res->indices[j])) {
+        index -= 1;
+        break;
+      }
+    if (_obj_triplet_eq(res->indices[i], triplet))
+      return _obj_memo_insert(triplet, index);
+    index += 1;
+  }
 
   assert(false && "Triplet not found");
 }
@@ -260,33 +298,47 @@ static obj_Unrolled obj_unroll_pun(obj_Result *res, size_t *vertex_count) {
     .indices  = (uint16_t*)malloc(res->index_count*sizeof(uint16_t)),
     .vertices = (float*)malloc(res->index_count*sizeof(float)*8), // POSITION 3 + UV 2 + NORMAL 3 
   };
+  printf("SAS\n");
   size_t maxpos = 0;
   for (size_t i = 0; i < res->index_count; i += 1) {
     obj_Triplet trp = res->indices[i];
     assert(trp.v != 0 && trp.vn != 0 && trp.vt != 0 && "Obj: Cannot consturct PUN format without according vertices present (malformed index)");
     assert(trp.v <= res->vertex_count && trp.vn <= res->normal_count && trp.vt <= res->uv_count && "Obj: Cannot consturct PUN format with index pointing to a vertex out of bounds (malformed index)");
 
-    const size_t triplet_pos = _obj_triplet_pos(res, trp);
+#ifdef _NDEBUG
+    const size_t triplet_pos = _obj_triplet_pos(res, trp, i+1);
+#else
+    const size_t triplet_pos = i;
+#endif
+
     maxpos = triplet_pos > maxpos ? triplet_pos : maxpos;
+    trp.v -= 1;  // (1 indexed fix)
+    trp.vn -= 1; // (1 indexed fix)
+    trp.vt -= 1; // (1 indexed fix)
     // Might have some redundant writes but it doesn't matter cuz triplet pos function already sucks
-    unrolled.vertices[triplet_pos*8+0] = res->vertices[trp.v+0];
-    unrolled.vertices[triplet_pos*8+1] = res->vertices[trp.v+1];
-    unrolled.vertices[triplet_pos*8+2] = res->vertices[trp.v+2];
+    unrolled.vertices[triplet_pos*8+0] = res->vertices[trp.v*3+0];
+    unrolled.vertices[triplet_pos*8+1] = res->vertices[trp.v*3+1];
+    unrolled.vertices[triplet_pos*8+2] = res->vertices[trp.v*3+2];
     // Uv
-    unrolled.vertices[triplet_pos*8+3] = res->uvs[trp.vt+0];
-    unrolled.vertices[triplet_pos*8+4] = res->uvs[trp.vt+1];   
+    unrolled.vertices[triplet_pos*8+3] = res->uvs[trp.vt*2+0];
+    unrolled.vertices[triplet_pos*8+4] = res->uvs[trp.vt*2+1];
     // Normals
-    unrolled.vertices[triplet_pos*8+5] = res->normals[trp.vn+0];
-    unrolled.vertices[triplet_pos*8+6] = res->normals[trp.vn+1];   
-    unrolled.vertices[triplet_pos*8+7] = res->normals[trp.vn+2];
+    unrolled.vertices[triplet_pos*8+5] = res->normals[trp.vn*3+0];
+    unrolled.vertices[triplet_pos*8+6] = res->normals[trp.vn*3+1];
+    unrolled.vertices[triplet_pos*8+7] = res->normals[trp.vn*3+2];
 
     unrolled.indices[i] = (uint16_t)triplet_pos;
   }
   if (vertex_count != NULL)
     *vertex_count = maxpos+1;
+  printf("Vertex count is %zu\n", *vertex_count);
   return unrolled;
 }
 
+static void obj_dispose_unrolled(obj_Unrolled *unrolled) {
+  free(unrolled->indices);
+  free(unrolled->vertices);
+}
 
 #undef Parser
 #undef chk

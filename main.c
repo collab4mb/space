@@ -36,28 +36,30 @@ void init(void) {
     .context = sapp_sgcontext()
   });
  
-  const char *input = fio_read_text("./Cube.obj");
+  char *input = fio_read_text("./Cube.obj");
 
   obj_Result res = obj_parse(input);
   size_t vertex_count;
   _indices = res.index_count;
   obj_Unrolled unrolled = obj_unroll_pun(&res, &vertex_count);
+  obj_dispose(&res);
+  
 
   /* a vertex buffer */
-  float *vertices = unrolled.vertices;
   sg_buffer vbuf = sg_make_buffer(&(sg_buffer_desc){
-    .data = (sg_range){vertices, vertex_count*sizeof(float)},
+    .data = (sg_range){unrolled.vertices, vertex_count*8*sizeof(float)},
     .label = "cube-vertices"
   });
   state.bind.vertex_buffers[0] = vbuf;
 
-  /* an index buffer with 2 triangles */
-  uint16_t *indices = unrolled.indices;
   sg_buffer ibuf = sg_make_buffer(&(sg_buffer_desc){
     .type = SG_BUFFERTYPE_INDEXBUFFER,
-    .data = (sg_range){indices, _indices*sizeof(uint16_t)},
+    .data = (sg_range){unrolled.indices, _indices*sizeof(uint16_t)},
     .label = "cube-indices"
   });
+  obj_dispose_unrolled(&unrolled);
+  free((void*)input);
+  exit(-1);
   state.bind.index_buffer = ibuf;
 
   /* a shader (use separate shader sources here */
@@ -67,8 +69,6 @@ void init(void) {
   /* a pipeline state object */
   state.pip = sg_make_pipeline(&(sg_pipeline_desc){
     .layout = {
-      /* test to provide buffer stride, but no attr offsets */
-      .buffers[0].stride = 32,
       .attrs = {
         [ATTR_vs_position].format = SG_VERTEXFORMAT_FLOAT3,
         [ATTR_vs_uv].format      = SG_VERTEXFORMAT_FLOAT2,
@@ -102,7 +102,8 @@ void frame(void) {
   Mat4 proj = perspective4x4(1.047f, w/h, 0.01f, 10.0f);
   Mat4 view = look_at4x4(vec3(0.0f, 1.5f, 6.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
   Mat4 view_proj = mul4x4(proj, view);
-  state.rx += 0.01f; state.ry += 0.02f;
+  state.rx += 0.01f; 
+  state.ry += 0.02f;
   Mat4 rxm = rotate4x4(vec3(1.0f, 0.0f, 0.0f), state.rx);
   Mat4 rym = rotate4x4(vec3(0.0f, 1.0f, 0.0f), state.ry);
   Mat4 model = mul4x4(rxm, rym);
