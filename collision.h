@@ -12,11 +12,11 @@ static void collision(Ent *ac) {
     if((depth = collision_intersects(ac,ent))<0.0f) {
       depth = sqrtf(m_abs(depth));
       Vec2 dir = norm2(sub2(ac->pos,ent->pos));
-      float wheight_sum = ac->wheight+ent->wheight;
+      float weight_sum = ac->weight+ent->weight;
       float ac_vel_len = mag2(sub2(ac->vel,ent->vel));
-      if(wheight_sum!=0.0f) {
-        ent->vel.x-=dir.x*ac_vel_len*(ac->wheight/wheight_sum);
-        ent->vel.y-=dir.y*ac_vel_len*(ac->wheight/wheight_sum);
+      if(weight_sum!=0.0f) {
+        ent->vel.x-=dir.x*ac_vel_len*(ac->weight/weight_sum);
+        ent->vel.y-=dir.y*ac_vel_len*(ac->weight/weight_sum);
       }
     }
   }
