@@ -39,6 +39,21 @@ typedef enum {
 } EntProp;
 
 typedef enum { Art_Ship, Art_Asteroid, Art_COUNT } Art;
+/* probably a better way to do this? we'll see */
+Mat4 art_tweaks[Art_COUNT] = {
+  [Art_Ship] = {{
+    0.3f, 0.0f, 0.0f, 0.0f,
+    0.0f, 0.3f, 0.0f, 0.0f,
+    0.0f, 0.0f, 0.3f, 0.0f,
+    0.0f, 0.0f, 0.0f, 1.0f,
+  }},
+  [Art_Asteroid] = {{
+    1.0f, 0.0f, 0.0f, 0.0f,
+    0.0f, 1.0f, 0.0f, 0.0f,
+    0.0f, 0.0f, 1.0f, 0.0f,
+    0.0f, 0.0f, 0.0f, 1.0f,
+  }}
+};
 
 /* A game entity. Usually, it is rendered somewhere and has some sort of dynamic behavior */
 typedef struct {
@@ -195,17 +210,12 @@ static void frame(void) {
     state->player->angle-=0.05f;
   if(input_key_down(SAPP_KEYCODE_RIGHT))
     state->player->angle+=0.05f;
-  Vec2 p_dir = vec2_rot(state->player->angle);
-  float t = p_dir.x;
-  p_dir.x = p_dir.y;
-  p_dir.y = t;
-  if(input_key_down(SAPP_KEYCODE_UP))
-  {
+  Vec2 p_dir = vec2_swap(vec2_rot(state->player->angle));
+  if (input_key_down(SAPP_KEYCODE_UP)) {
     state->player->pos.x+=p_dir.x*0.2f;
     state->player->pos.y+=p_dir.y*0.2f;
   }
-  if(input_key_down(SAPP_KEYCODE_DOWN))
-  {
+  if (input_key_down(SAPP_KEYCODE_DOWN)) {
     state->player->pos.x-=p_dir.x*0.2f;
     state->player->pos.y-=p_dir.y*0.2f;
   }
@@ -213,7 +223,18 @@ static void frame(void) {
   const float w = sapp_widthf();
   const float h = sapp_heightf();
   Mat4 proj = perspective4x4(1.047f, w/h, 0.01f, 50.0f);
-  Mat4 view = look_at4x4(vec3(state->player->pos.x-p_dir.x*5.0f, 5.0f,state->player->pos.y-p_dir.y*10.0f), vec3(state->player->pos.x, 0.0f, state->player->pos.y), vec3(0.0f, 1.0f, 0.0f));
+
+  static float cam_angle = 0.0f;
+  cam_angle = lerp(cam_angle, state->player->angle, 0.08);
+  Vec2 cam_dir = vec2_swap(vec2_rot(cam_angle));
+
+  Vec3 plr_p = {state->player->pos.x, 0.0f, state->player->pos.y};
+  Vec3 cam_o = {           cam_dir.x, 1.0f,          cam_dir.y};
+  Mat4 view = look_at4x4(
+    add3(plr_p, mul3(vec3(-5,  3, -5), cam_o)),
+    add3(plr_p, mul3(vec3( 5,  0,  5), cam_o)),
+    vec3_y
+  );
   Mat4 vp = mul4x4(proj, view);
 
   sg_pass_action pass_action = {
@@ -227,6 +248,7 @@ static void frame(void) {
   for (Ent *ent = 0; (ent = ent_all_iter(ent));) {
     Mat4 m = translate4x4(vec3(ent->pos.x, 0.0f, ent->pos.y));
     m = mul4x4(m, rotate4x4(vec3_y, ent->angle));
+    m = mul4x4(m, art_tweaks[ent->art]);
     draw_mesh(vp, m, ent->art);
   }
   sg_end_pass();

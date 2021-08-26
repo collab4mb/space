@@ -60,6 +60,7 @@ static float magmag2(Vec2 a);
 static Vec2 norm2(Vec2 a);
 static Vec2 abs2(Vec2 a);
 static Vec2 sign2(Vec2 a);
+static Vec2 vec2_swap(Vec2 v);
 static Vec2 vec2_rot(float rot);
 static float rot_vec2(Vec2 rot);
 
@@ -105,6 +106,7 @@ static Vec4 sign4(Vec4 a);
 
 //Matrix
 static Mat4 mul4x4(Mat4 a, Mat4 b);
+static Mat4 scale4x4(Vec3 v);
 static Mat4 ident4x4();
 static Mat4 transpose4x4(Mat4 a);
 static Mat4 translate4x4(Vec3 pos);
@@ -317,6 +319,10 @@ static Vec3 sign3(Vec3 a) {
 
 static Vec4 sign4(Vec4 a) {
   return vec4(sign(a.x), sign(a.y), sign(a.z), sign(a.w));
+}
+
+static Vec2 vec2_swap(Vec2 v) {
+  return vec2(v.y, v.x);
 }
 
 static Vec2 vec2_rot(float rot) {
