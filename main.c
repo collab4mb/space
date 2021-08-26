@@ -34,6 +34,9 @@ typedef enum {
   /* Prevents the Ent's memory from being reused, enables all other codepaths. */
   EntProp_Active,
 
+  /* A bit of motion makes asteroids & co. feel more alive */
+  EntProp_PassiveRotate,
+
   /* Knowing how many EntProps there are facilitates allocating just enough memory */
   EntProp_COUNT,
 } EntProp;
@@ -63,6 +66,9 @@ typedef struct {
   Vec2 pos;
   Art art;
   float angle;
+
+  Vec3 passive_rotate_axis;
+  float passive_rotate_angle;
 } Ent;
 static inline bool has_ent_prop(Ent *ent, EntProp prop) {
   return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
@@ -85,6 +91,7 @@ typedef struct {
   sg_bindings bind;
   Ent ents[STATE_MAX_ENTS];
   Ent *player;
+  float player_turn_accel;
 } State;
 static State *state;
 
@@ -155,13 +162,36 @@ void load_mesh(const char *path, Art art) {
 }
 
 void init(void) {
+  seed_rand(9, 12, 32, 10);
+
   state = calloc(sizeof(State), 1);
 
-  state->player = add_ent((Ent) { .art = Art_Ship, .pos = {  0,  2.5 } });
-  add_ent((Ent) { .art = Art_Asteroid, .pos = {  2, -3.0 } });
-  add_ent((Ent) { .art = Art_Asteroid, .pos = {  5, -2.0 } });
-  add_ent((Ent) { .art = Art_Asteroid, .pos = { -3, -4.0 } });
+  state->player = add_ent((Ent) {
+    .art = Art_Ship,
+    .pos = { -1, 2.5 }
+  });
+  #define ASTEROIDS_PER_RING (7)
+  #define ASTEROID_RINGS (3)
+  #define ASTEROID_RING_SPACING (20.0f)
+  #define ASTEROID_FIRST_RING_START_DIST (12.0f)
+  #define ASTEROID_DIST_RANDOMIZER (3.0f)
+  for (int r = 0; r < ASTEROID_RINGS; r++)
+    for (int i = 0; i < ASTEROIDS_PER_RING; i++) {
+      float dist = ASTEROID_FIRST_RING_START_DIST;
+      dist += r*ASTEROID_RING_SPACING;
 
+      float t = (float)i / (float)ASTEROIDS_PER_RING;
+      t += randf() * (PI_f * 2.0f * dist) / (float) ASTEROIDS_PER_RING;
+
+      dist += ASTEROID_DIST_RANDOMIZER * (0.5f - randf()) * 2.0f;
+
+      Ent *ast = add_ent((Ent) {
+        .art = Art_Asteroid,
+        .pos = mul2_f(vec2_rot(t * PI_f * 2.0), dist),
+      });
+      ast->passive_rotate_axis = rand3();
+      give_ent_prop(ast, EntProp_PassiveRotate);
+    }
 
   sg_setup(&(sg_desc){
     .context = sapp_sgcontext()
@@ -206,23 +236,28 @@ static void draw_mesh(Mat4 vp, Mat4 model, Art art) {
 
 static void frame(void) {
   //Player input
+  float angle_delta = 0;
   if(input_key_down(SAPP_KEYCODE_LEFT))
-    state->player->angle-=0.05f;
+    angle_delta -= 0.05f;
   if(input_key_down(SAPP_KEYCODE_RIGHT))
-    state->player->angle+=0.05f;
+    angle_delta += 0.05f;
+  state->player->angle += angle_delta;
+  state->player_turn_accel += angle_delta;
+  state->player_turn_accel *= 0.8;
+
   Vec2 p_dir = vec2_swap(vec2_rot(state->player->angle));
   if (input_key_down(SAPP_KEYCODE_UP)) {
-    state->player->pos.x+=p_dir.x*0.2f;
-    state->player->pos.y+=p_dir.y*0.2f;
+    state->player->pos.x += p_dir.x*0.2f;
+    state->player->pos.y += p_dir.y*0.2f;
   }
   if (input_key_down(SAPP_KEYCODE_DOWN)) {
-    state->player->pos.x-=p_dir.x*0.2f;
-    state->player->pos.y-=p_dir.y*0.2f;
+    state->player->pos.x -= p_dir.x*0.2f;
+    state->player->pos.y -= p_dir.y*0.2f;
   }
 
   const float w = sapp_widthf();
   const float h = sapp_heightf();
-  Mat4 proj = perspective4x4(1.047f, w/h, 0.01f, 50.0f);
+  Mat4 proj = perspective4x4(1.047f, w/h, 0.01f, 100.0f);
 
   static float cam_angle = 0.0f;
   cam_angle = lerp(cam_angle, state->player->angle, 0.08);
@@ -247,7 +282,14 @@ static void frame(void) {
    * TODO: optimize for fewer draw calls */
   for (Ent *ent = 0; (ent = ent_all_iter(ent));) {
     Mat4 m = translate4x4(vec3(ent->pos.x, 0.0f, ent->pos.y));
-    m = mul4x4(m, rotate4x4(vec3_y, ent->angle));
+
+    m = mul4x4(m, y_rotate4x4(ent->angle));
+    if (ent == state->player)
+      m = mul4x4(m, z_rotate4x4(state->player_turn_accel*-2.0f));
+    if (has_ent_prop(ent, EntProp_PassiveRotate))
+      m = mul4x4(m, rotate4x4(ent->passive_rotate_axis,
+                              ent->passive_rotate_angle += 0.01));
+
     m = mul4x4(m, art_tweaks[ent->art]);
     draw_mesh(vp, m, ent->art);
   }

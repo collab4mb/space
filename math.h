@@ -42,6 +42,10 @@ static float to_radians(float degrees);
 static float lerp(float a, float b, float t);
 static float sign(float f);
 static float step(float edge, float x);
+static uint32_t rand32(void);
+static void seed_rand(uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3);
+static float randf(void);
+static uint32_t rotl(const uint32_t x, int k);
 
 //Vector operations
 //2d
@@ -86,6 +90,7 @@ static Vec3 zxy3(Vec3 v);
 static Vec3 step3(Vec3 a, Vec3 b);
 static Vec3 lerp3(Vec3 a, Vec3 b, float t);
 static Vec3 cross3(Vec3 a, Vec3 b);
+static Vec3 rand3(void);
 
 //4d
 static Vec4 vec4(float x, float y, float z, float w);
@@ -111,6 +116,8 @@ static Mat4 ident4x4();
 static Mat4 transpose4x4(Mat4 a);
 static Mat4 translate4x4(Vec3 pos);
 static Mat4 rotate4x4(Vec3 axis, float angle);
+static Mat4 y_rotate4x4(float angle);
+static Mat4 z_rotate4x4(float angle);
 static Mat4 perspective4x4(float fov, float aspect, float n, float f);
 static Mat4 look_at4x4(Vec3 eye, Vec3 focus, Vec3 up);
 
@@ -139,6 +146,37 @@ static float sign(float f) {
 
 static float step(float edge, float x) {
   return (x < edge) ? 0.0f : 1.0f;
+}
+
+static uint32_t rotl(const uint32_t x, int k) {
+    return (x << k) | (x >> (32 - k));
+}
+static uint32_t _math_rand_seed[4];
+/* source: http://prng.di.unimi.it/xoshiro128plus.c
+   NOTE: The state must be seeded so that it is not everywhere zero. */
+static uint32_t rand32(void) {
+    const uint32_t result = _math_rand_seed[0] + _math_rand_seed[3],
+                        t = _math_rand_seed[1] << 9;
+
+    _math_rand_seed[2] ^= _math_rand_seed[0];
+    _math_rand_seed[3] ^= _math_rand_seed[1];
+    _math_rand_seed[1] ^= _math_rand_seed[2];
+    _math_rand_seed[0] ^= _math_rand_seed[3];
+
+    _math_rand_seed[2] ^= t;
+
+    _math_rand_seed[3] = rotl(_math_rand_seed[3], 11);
+
+    return result;
+}
+static void seed_rand(uint32_t s0, uint32_t s1, uint32_t s2, uint32_t s3) {
+    _math_rand_seed[0] = s0;
+    _math_rand_seed[1] = s1;
+    _math_rand_seed[2] = s2;
+    _math_rand_seed[3] = s3;
+}
+static inline float randf(void) {
+    return (rand32() >> 8) * 0x1.0p-24f;
 }
 
 static Vec2 vec2(float x, float y) {
@@ -353,6 +391,16 @@ static Vec3 cross3(Vec3 a, Vec3 b) {
               (a.x * b.y) - (a.y * b.x));
 }
 
+static Vec3 rand3(void) {
+    float theta = randf() * PI_f * 2.0f,
+              z = 1.0f - randf() * 2.0f,
+             cz = sqrtf(1.0f - powf(z, 2.0f));
+
+    return vec3(cz * cosf(theta),
+                cz * sinf(theta),
+                z               );
+}
+
 static Mat4 mul4x4(Mat4 a, Mat4 b) {
   Mat4 out = {0};
   int8_t k, r, c;
@@ -413,6 +461,28 @@ static Mat4 rotate4x4(Vec3 axis, float angle) {
   res.nums[2][2] = (axis.z * axis.z * cos_value) + cos_theta;
 
   return res;
+}
+
+static Mat4 y_rotate4x4(float angle) {
+  float c = cosf(angle);
+  float s = sinf(angle);
+  return (Mat4) {{
+         c, 0.0f,   -s, 0.0f,
+      0.0f, 1.0f, 0.0f, 0.0f,
+         s, 0.0f,    c, 0.0f,
+      0.0f, 0.0f, 0.0f, 1.0f
+  }};
+}
+
+static Mat4 z_rotate4x4(float angle) {
+  float c = cosf(angle);
+  float s = sinf(angle);
+  return (Mat4) {{
+         c,    s, 0.0f, 0.0f,
+        -s,    c, 0.0f, 0.0f,
+      0.0f, 0.0f, 1.0f, 0.0f,
+      0.0f, 0.0f, 0.0f, 1.0f
+  }};
 }
 
 /* equivalent to XMMatrixPerspectiveFovLH
