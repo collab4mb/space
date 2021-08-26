@@ -15,10 +15,10 @@ out vec2 fsuv;
 out vec4 color;
 
 void main() {
-  vec3 lightsource = normalize(vec3(0.1, 1.0, 0.2));
+  vec3 lightdir = normalize(vec3(0.1, 1.0, 0.2));
   gl_Position = mvp * vec4(position, 1.0);
-  vec3 at = vec3(model * vec4(position, 1.0));
-  float intensity = dot(normal, normalize(lightsource-at))*0.7;
+  vec3 dir = vec3(model * vec4(position + normal, 1.0)) - vec3(model * vec4(position, 1.0));
+  float intensity = dot(dir, lightdir)*0.7;
   intensity = clamp(intensity, 0.05, 1.0);
   color = vec4(intensity, intensity, intensity, 1.0);
   fsuv = uv;
