@@ -18,6 +18,8 @@
 
 #include <math.h>
 #include "math.h"
+#include "fio.h"
+#include "obj.h"
 
 #include "build/shaders.glsl.h"
 
@@ -28,71 +30,35 @@ static struct {
   sg_bindings bind;
 } state;
 
+static size_t _indices = 0;
 void init(void) {
   sg_setup(&(sg_desc){
     .context = sapp_sgcontext()
   });
+ 
+  const char *input = fio_read_text("./Cube.obj");
+
+  obj_Result res = obj_parse(input);
+  size_t vertex_count;
+  _indices = res.index_count;
+  obj_Unrolled unrolled = obj_unroll_pun(&res, &vertex_count);
 
   /* a vertex buffer */
-  float vertices[] = {
-    -1.0, -1.0, -1.0,   1.0, 0.0, 0.0, 1.0,
-     1.0, -1.0, -1.0,   1.0, 0.0, 0.0, 1.0,
-     1.0,  1.0, -1.0,   1.0, 0.0, 0.0, 1.0,
-    -1.0,  1.0, -1.0,   1.0, 0.0, 0.0, 1.0,
-
-    -1.0, -1.0,  1.0,   0.0, 1.0, 0.0, 1.0,
-     1.0, -1.0,  1.0,   0.0, 1.0, 0.0, 1.0,
-     1.0,  1.0,  1.0,   0.0, 1.0, 0.0, 1.0,
-    -1.0,  1.0,  1.0,   0.0, 1.0, 0.0, 1.0,
-
-    -1.0, -1.0, -1.0,   0.0, 0.0, 1.0, 1.0,
-    -1.0,  1.0, -1.0,   0.0, 0.0, 1.0, 1.0,
-    -1.0,  1.0,  1.0,   0.0, 0.0, 1.0, 1.0,
-    -1.0, -1.0,  1.0,   0.0, 0.0, 1.0, 1.0,
-
-     1.0, -1.0, -1.0,    1.0, 0.5, 0.0, 1.0,
-     1.0,  1.0, -1.0,    1.0, 0.5, 0.0, 1.0,
-     1.0,  1.0,  1.0,    1.0, 0.5, 0.0, 1.0,
-     1.0, -1.0,  1.0,    1.0, 0.5, 0.0, 1.0,
-
-    -1.0, -1.0, -1.0,   0.0, 0.5, 1.0, 1.0,
-    -1.0, -1.0,  1.0,   0.0, 0.5, 1.0, 1.0,
-     1.0, -1.0,  1.0,   0.0, 0.5, 1.0, 1.0,
-     1.0, -1.0, -1.0,   0.0, 0.5, 1.0, 1.0,
-
-    -1.0,  1.0, -1.0,   1.0, 0.0, 0.5, 1.0,
-    -1.0,  1.0,  1.0,   1.0, 0.0, 0.5, 1.0,
-     1.0,  1.0,  1.0,   1.0, 0.0, 0.5, 1.0,
-     1.0,  1.0, -1.0,   1.0, 0.0, 0.5, 1.0
-  };
-   sg_buffer vbuf = sg_make_buffer(&(sg_buffer_desc){
-        .data = SG_RANGE(vertices),
-        .label = "cube-vertices"
-   });
-  state.bind.vertex_buffers[0] = sg_make_buffer(&(sg_buffer_desc){
-    .data = SG_RANGE(vertices),
+  float *vertices = unrolled.vertices;
+  sg_buffer vbuf = sg_make_buffer(&(sg_buffer_desc){
+    .data = (sg_range){vertices, vertex_count*sizeof(float)},
     .label = "cube-vertices"
   });
+  state.bind.vertex_buffers[0] = vbuf;
 
   /* an index buffer with 2 triangles */
-   uint16_t indices[] = {
-     0, 1, 2,  0, 2, 3,
-     6, 5, 4,  7, 6, 4,
-     8, 9, 10,  8, 10, 11,
-     14, 13, 12,  15, 14, 12,
-     16, 17, 18,  16, 18, 19,
-     22, 21, 20,  23, 22, 20
-   };
-   sg_buffer ibuf = sg_make_buffer(&(sg_buffer_desc){
-     .type = SG_BUFFERTYPE_INDEXBUFFER,
-     .data = SG_RANGE(indices),
-     .label = "cube-indices"
-   });
-  state.bind.index_buffer = sg_make_buffer(&(sg_buffer_desc){
+  uint16_t *indices = unrolled.indices;
+  sg_buffer ibuf = sg_make_buffer(&(sg_buffer_desc){
     .type = SG_BUFFERTYPE_INDEXBUFFER,
-    .data = SG_RANGE(indices),
+    .data = (sg_range){indices, _indices*sizeof(uint16_t)},
     .label = "cube-indices"
   });
+  state.bind.index_buffer = ibuf;
 
   /* a shader (use separate shader sources here */
   //sg_shader shd = sg_make_shader(quad_shader_desc(sg_query_backend()));
@@ -101,11 +67,12 @@ void init(void) {
   /* a pipeline state object */
   state.pip = sg_make_pipeline(&(sg_pipeline_desc){
     .layout = {
-    /* test to provide buffer stride, but no attr offsets */
-    .buffers[0].stride = 28,
+      /* test to provide buffer stride, but no attr offsets */
+      .buffers[0].stride = 32,
       .attrs = {
         [ATTR_vs_position].format = SG_VERTEXFORMAT_FLOAT3,
-        [ATTR_vs_color0].format   = SG_VERTEXFORMAT_FLOAT4
+        [ATTR_vs_uv].format      = SG_VERTEXFORMAT_FLOAT2,
+        [ATTR_vs_normal].format   = SG_VERTEXFORMAT_FLOAT3,
       }
     },
     .shader = shd,
@@ -148,7 +115,7 @@ void frame(void) {
   sg_apply_pipeline(state.pip);
   sg_apply_bindings(&state.bind);
   sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_vs_params, &SG_RANGE(vs_params));
-  sg_draw(0, 36, 1);
+  sg_draw(0, _indices, 1);
   sg_end_pass();
   sg_commit();
 }

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+__attribute__((unused))
 static char* fio_read_text(const char *path)
 {
   FILE *f = fopen(path, "r");
@@ -16,6 +17,7 @@ static char* fio_read_text(const char *path)
   return input;
 }
 
+__attribute__((unused))
 static void fio_write_text(const char *path, const char *text)
 {
   FILE *f = fopen(path, "w+");
