@@ -1,3 +1,7 @@
+#define MAX_SPEED2 (0.4f*0.4f)
+#define ACCEL 0.002f
+#define DECEL 0.002f
+
 static void player_update(Ent *player) {
   //Player input
   if(input_key_down(SAPP_KEYCODE_LEFT))
@@ -8,14 +12,35 @@ static void player_update(Ent *player) {
   float t = player->dir.x;
   player->dir.x = player->dir.y;
   player->dir.y = t;
-  if(input_key_down(SAPP_KEYCODE_UP))
-  {
-    player->pos.x+=player->dir.x*0.2f;
-    player->pos.y+=player->dir.y*0.2f;
+
+  //TODO: this could cause problems on low fps
+  if(input_key_down(SAPP_KEYCODE_UP)) {
+    if(magmag2(player->vel)<MAX_SPEED2) {
+      player->vel.x+=player->dir.x*0.002f;
+      player->vel.y+=player->dir.y*0.002f;
+    }
   }
-  if(input_key_down(SAPP_KEYCODE_DOWN))
-  {
-    player->pos.x-=player->dir.x*0.2f;
-    player->pos.y-=player->dir.y*0.2f;
+  else if(input_key_down(SAPP_KEYCODE_DOWN)) {
+    if(magmag2(player->vel)<MAX_SPEED2) {
+      player->vel.x-=player->dir.x*ACCEL;
+      player->vel.y-=player->dir.y*ACCEL;
+    }
   }
+  else {
+    //Decelerate
+    float len = mag2(player->vel);
+    if(len!=0.0f) {
+      player->vel = norm2(player->vel);
+      len-=DECEL;
+      len = len<0.0f?0.0f:len;
+      player->vel = mul2_f(player->vel,len);
+    }
+  }
+
+  player->pos.x+=player->vel.x;
+  player->pos.y+=player->vel.y;
 }
+
+#undef MAX_SPEED2
+#undef ACCEL
+#undef DECEL
