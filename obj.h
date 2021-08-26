@@ -294,18 +294,20 @@ static size_t _obj_triplet_pos(obj_Result *res, obj_Triplet triplet, size_t nd) 
 // Unrolls as (POSITION3, UV2, NORMAL3)
 __attribute__((unused))
 static obj_Unrolled obj_unroll_pun(obj_Result *res, size_t *vertex_count) {
+#ifdef NDEBUG
+  memset(_obj_memo, 0, sizeof(_obj_memo));
+#endif
   obj_Unrolled unrolled = {
     .indices  = (uint16_t*)malloc(res->index_count*sizeof(uint16_t)),
     .vertices = (float*)malloc(res->index_count*sizeof(float)*8), // POSITION 3 + UV 2 + NORMAL 3 
   };
-  printf("SAS\n");
   size_t maxpos = 0;
   for (size_t i = 0; i < res->index_count; i += 1) {
     obj_Triplet trp = res->indices[i];
     assert(trp.v != 0 && trp.vn != 0 && trp.vt != 0 && "Obj: Cannot consturct PUN format without according vertices present (malformed index)");
     assert(trp.v <= res->vertex_count && trp.vn <= res->normal_count && trp.vt <= res->uv_count && "Obj: Cannot consturct PUN format with index pointing to a vertex out of bounds (malformed index)");
 
-#ifdef _NDEBUG
+#ifdef NDEBUG
     const size_t triplet_pos = _obj_triplet_pos(res, trp, i+1);
 #else
     const size_t triplet_pos = i;
