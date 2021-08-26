@@ -2,12 +2,6 @@
 *.swo
 build/*
 
-# windows compiler output
-*.exe
-*.pdb
-*.ilk
-*.exp
-
 # shader compiler output
 *.glsl.h
 
