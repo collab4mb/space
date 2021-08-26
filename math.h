@@ -448,6 +448,26 @@ static Mat4 look_at4x4(Vec3 eye, Vec3 focus, Vec3 up) {
   }};
 }
 
+static Mat4 ortho4x4(
+  float view_width,
+  float view_height,
+  float near_z,
+  float far_z
+) {
+  float f_range = 1.0f / (far_z - near_z);
+
+  Mat4 res;
+  res.nums[0][0] = 2.0f / view_width;
+
+  res.nums[1][1] = 2.0f / view_height;
+
+  res.nums[2][2] = f_range;
+
+  res.nums[3][2] = -f_range * near_z;
+  res.nums[3][3] = 1.0f;
+  return res;
+}
+
 #endif
 #endif
 #endif

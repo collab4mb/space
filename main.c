@@ -13,6 +13,8 @@
 
 #define SOKOL_WIN32_FORCE_MAIN
 #include "sokol/sokol_app.h"
+#define CUTE_PNG_IMPLEMENTATION
+#include "cute_png.h"
 #include "sokol/sokol_gfx.h"
 #include "sokol/sokol_glue.h"
 
@@ -24,6 +26,7 @@
 #include "input.h"
 
 #include "build/shaders.glsl.h"
+#include "overlay.h"
 
 /* EntProps enable codepaths for game entities.
    These aren't boolean fields because that makes it more difficult to deal with
@@ -48,6 +51,7 @@ typedef struct {
   Vec2 pos;
   Art art;
   float angle;
+  float scale_delta;
 } Ent;
 static inline bool has_ent_prop(Ent *ent, EntProp prop) {
   return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
@@ -106,11 +110,12 @@ static inline Ent *ent_all_iter(Ent *ent) {
 
 static struct {
   sg_buffer ibuf, vbuf;
+  sg_image texture;
   size_t id;
   size_t index_count;
 } meshes[Art_COUNT] = { 0 };
 
-void load_mesh(const char *path, Art art) {
+void load_mesh(const char *path, const char *texture, Art art) {
   char *input = fio_read_text(path);
   if (input == NULL) {
     fprintf(stderr, "Could not load asset %s, file inaccessible\n", path);
@@ -132,7 +137,17 @@ void load_mesh(const char *path, Art art) {
     .type = SG_BUFFERTYPE_INDEXBUFFER,
     .data = (sg_range){unrolled.indices, res.index_count*sizeof(uint16_t)},
   });
+
+
+  cp_image_t player_png = cp_load_png(texture);
+  cp_flip_image_horizontal(&player_png);
   state->bind.index_buffer = ibuf;
+  meshes[art].texture = sg_make_image(&(sg_image_desc){
+    .width = player_png.w,
+    .height = player_png.h,
+    .data.subimage[0][0] = (sg_range){ player_png.pix,player_png.w*player_png.h*sizeof(cp_pixel_t) } ,
+  });
+  cp_free_png(&player_png);
   meshes[art].ibuf = ibuf; meshes[art].vbuf = vbuf; 
   meshes[art].id = art; meshes[art].index_count = res.index_count;
   obj_dispose_unrolled(&unrolled);
@@ -143,21 +158,24 @@ void init(void) {
   state = calloc(sizeof(State), 1);
 
   state->player = add_ent((Ent) { .art = Art_Ship, .pos = {  0,  2.5 } });
-  add_ent((Ent) { .art = Art_Asteroid, .pos = {  2, -3.0 } });
-  add_ent((Ent) { .art = Art_Asteroid, .pos = {  5, -2.0 } });
-  add_ent((Ent) { .art = Art_Asteroid, .pos = { -3, -4.0 } });
+  for (int i = 0; i < 100; i += 1) {
+    add_ent((Ent) { .art = Art_Asteroid, .angle = (rand()%314)/314.0, .pos = {  rand()%1000-500, rand()%1000-500 }, .scale_delta = (rand()%20)/3.0 });
+  }
 
 
   sg_setup(&(sg_desc){
     .context = sapp_sgcontext()
   });
 
-  load_mesh("./Bob.obj", Art_Ship);
-  load_mesh("./Asteroid.obj", Art_Asteroid);
+
+  load_mesh("./Bob.obj", "./Bob_Orange.png", Art_Ship);
+  load_mesh("./Asteroid.obj", "./Moon.png", Art_Asteroid);
  
 
-  /* a shader (use separate shader sources here */
-  sg_shader shd = sg_make_shader(cube_shader_desc(sg_query_backend()));
+  /* a shader use separate shader sources here */
+  sg_shader shd = sg_make_shader(mesh_shader_desc(sg_query_backend()));
+
+  ol_init();
 
   /* a pipeline state object */
   state->pip = sg_make_pipeline(&(sg_pipeline_desc){
@@ -176,21 +194,20 @@ void init(void) {
       .compare = SG_COMPAREFUNC_LESS_EQUAL,
     },
   }); 
-
 }
 
 static void draw_mesh(Mat4 vp, Mat4 model, Art art) {
+  state->bind.fs_images[SLOT_tex] = meshes[art].texture;
   state->bind.index_buffer = meshes[art].ibuf;
   state->bind.vertex_buffers[0] = meshes[art].vbuf;
   sg_apply_bindings(&state->bind);
-  vs_params_t vs_params = { .mvp = mul4x4(vp, model) };
+  vs_params_t vs_params = { .mvp = mul4x4(vp, model), .model = model };
   sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_vs_params, &SG_RANGE(vs_params));
   sg_draw(0, meshes[art].index_count, 1);
 }
 
 
 static void frame(void) {
-  //Player input
   if(input_key_down(SAPP_KEYCODE_LEFT))
     state->player->angle-=0.05f;
   if(input_key_down(SAPP_KEYCODE_RIGHT))
@@ -199,21 +216,19 @@ static void frame(void) {
   float t = p_dir.x;
   p_dir.x = p_dir.y;
   p_dir.y = t;
-  if(input_key_down(SAPP_KEYCODE_UP))
-  {
+  if(input_key_down(SAPP_KEYCODE_UP)) {
     state->player->pos.x+=p_dir.x*0.2f;
     state->player->pos.y+=p_dir.y*0.2f;
   }
-  if(input_key_down(SAPP_KEYCODE_DOWN))
-  {
+  if(input_key_down(SAPP_KEYCODE_DOWN)) {
     state->player->pos.x-=p_dir.x*0.2f;
     state->player->pos.y-=p_dir.y*0.2f;
   }
 
   const float w = sapp_widthf();
   const float h = sapp_heightf();
-  Mat4 proj = perspective4x4(1.047f, w/h, 0.01f, 50.0f);
-  Mat4 view = look_at4x4(vec3(state->player->pos.x-p_dir.x*5.0f, 5.0f,state->player->pos.y-p_dir.y*10.0f), vec3(state->player->pos.x, 0.0f, state->player->pos.y), vec3(0.0f, 1.0f, 0.0f));
+  Mat4 proj = perspective4x4(1.047f, w/h, 0.01f, 200.0f);
+  Mat4 view = look_at4x4(vec3(state->player->pos.x-p_dir.x*9.0, 3.0f,state->player->pos.y-p_dir.y*10.0f), vec3(state->player->pos.x, 0.0f, state->player->pos.y), vec3(0.0f, 1.0f, 0.0f));
   Mat4 vp = mul4x4(proj, view);
 
   sg_pass_action pass_action = {
@@ -226,9 +241,24 @@ static void frame(void) {
    * TODO: optimize for fewer draw calls */
   for (Ent *ent = 0; (ent = ent_all_iter(ent));) {
     Mat4 m = translate4x4(vec3(ent->pos.x, 0.0f, ent->pos.y));
+    m = mul4x4(m, scale4x4(vec3(1.0f+ent->scale_delta, 1.0f+ent->scale_delta, 1.0f+ent->scale_delta)));
     m = mul4x4(m, rotate4x4(vec3_y, ent->angle));
     draw_mesh(vp, m, ent->art);
   }
+  ol_begin();
+  char *txt = 
+    "..#..#.."
+    "..#..#.."
+    "..#..#.."
+    "#......#"
+    ".######.";
+  
+  size_t l = strlen(txt);
+
+  for (size_t i = 0; i < l; i += 1)
+    if (txt[i] == '#')
+      ol_draw_rect(vec4(1.0, i/(float)l, 0.0, 1.0), (i%8)*10, (i/8)*10, 10, 10);
+
   sg_end_pass();
   sg_commit();
 
