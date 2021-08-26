@@ -225,19 +225,9 @@ static void frame(void) {
   /* naively render with n draw calls per entity
    * TODO: optimize for fewer draw calls */
   for (Ent *ent = 0; (ent = ent_all_iter(ent));) {
-    switch (ent->art) {
-      case Art_COUNT: break;
-      case Art_Asteroid: {
-        Mat4 m = translate4x4(vec3(ent->pos.x, 0.5f, ent->pos.y));
-        draw_mesh(vp, m, Art_Asteroid);
-      } break;
-      case Art_Ship: {
-        Mat4 m = translate4x4(vec3(ent->pos.x, 0.0f, ent->pos.y));
- //       m = mul4x4(m, scale4x4(vec3(1.0f, 0.3f, 1.0f)));
-        m = mul4x4(m, rotate4x4(vec3_y, ent->angle));
-        draw_mesh(vp, m, Art_Ship);
-      } break;
-    }
+    Mat4 m = translate4x4(vec3(ent->pos.x, 0.0f, ent->pos.y));
+    m = mul4x4(m, rotate4x4(vec3_y, ent->angle));
+    draw_mesh(vp, m, ent->art);
   }
   sg_end_pass();
   sg_commit();
