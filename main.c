@@ -112,6 +112,10 @@ static struct {
 
 void load_mesh(const char *path, Art art) {
   char *input = fio_read_text(path);
+  if (input == NULL) {
+    fprintf(stderr, "Could not load asset %s, file inaccessible\n", path);
+    exit(1);
+  }
   obj_Result res = obj_parse(input);
   size_t vertex_count;
   obj_Unrolled unrolled = obj_unroll_pun(&res, &vertex_count);
@@ -229,7 +233,7 @@ static void frame(void) {
       } break;
       case Art_Ship: {
         Mat4 m = translate4x4(vec3(ent->pos.x, 0.0f, ent->pos.y));
-        m = mul4x4(m, scale4x4(vec3(1.0f, 0.3f, 1.0f)));
+ //       m = mul4x4(m, scale4x4(vec3(1.0f, 0.3f, 1.0f)));
         m = mul4x4(m, rotate4x4(vec3_y, ent->angle));
         draw_mesh(vp, m, Art_Ship);
       } break;

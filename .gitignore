@@ -4,7 +4,6 @@ build/*
 
 # windows compiler output
 *.exe
-*.obj
 *.pdb
 *.ilk
 *.exp
