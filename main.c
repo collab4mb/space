@@ -18,6 +18,8 @@
 
 #include <math.h>
 #include "math.h"
+#include "fio.h"
+#include "obj.h"
 
 #include "input.h"
 
@@ -36,14 +38,16 @@ typedef enum {
   EntProp_COUNT,
 } EntProp;
 
-typedef enum { Art_Ship, Art_Cube } Art;
+typedef enum { Art_Ship, Art_Asteroid, Art_COUNT } Art;
 
 /* A game entity. Usually, it is rendered somewhere and has some sort of dynamic behavior */
 typedef struct {
   /* packed into 64 bit sections for alignment */
   uint64_t props[(EntProp_COUNT + 63) / 64];
+
   Vec2 pos;
   Art art;
+  float angle;
 } Ent;
 static inline bool has_ent_prop(Ent *ent, EntProp prop) {
   return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
@@ -65,6 +69,7 @@ typedef struct {
   sg_pipeline pip;
   sg_bindings bind;
   Ent ents[STATE_MAX_ENTS];
+  Ent *player;
 } State;
 static State *state;
 
@@ -99,79 +104,57 @@ static inline Ent *ent_all_iter(Ent *ent) {
   return NULL;
 }
 
+static struct {
+  sg_buffer ibuf, vbuf;
+  size_t id;
+  size_t index_count;
+} meshes[Art_COUNT] = { 0 };
+
+void load_mesh(const char *path, Art art) {
+  char *input = fio_read_text(path);
+  if (input == NULL) {
+    fprintf(stderr, "Could not load asset %s, file inaccessible\n", path);
+    exit(1);
+  }
+  obj_Result res = obj_parse(input);
+  size_t vertex_count;
+  obj_Unrolled unrolled = obj_unroll_pun(&res, &vertex_count);
+  obj_dispose(&res);
+  
+
+  /* a vertex buffer */
+  sg_buffer vbuf = sg_make_buffer(&(sg_buffer_desc){
+    .data = (sg_range){unrolled.vertices, vertex_count*8*sizeof(float)},
+  });
+  state->bind.vertex_buffers[0] = vbuf;
+
+  sg_buffer ibuf = sg_make_buffer(&(sg_buffer_desc){
+    .type = SG_BUFFERTYPE_INDEXBUFFER,
+    .data = (sg_range){unrolled.indices, res.index_count*sizeof(uint16_t)},
+  });
+  state->bind.index_buffer = ibuf;
+  meshes[art].ibuf = ibuf; meshes[art].vbuf = vbuf; 
+  meshes[art].id = art; meshes[art].index_count = res.index_count;
+  obj_dispose_unrolled(&unrolled);
+  free((void*)input);
+}
+
 void init(void) {
   state = calloc(sizeof(State), 1);
 
-  add_ent((Ent) { .art = Art_Ship, .pos = {  0,  2.5 } });
-  add_ent((Ent) { .art = Art_Cube, .pos = {  2, -3.0 } });
-  add_ent((Ent) { .art = Art_Cube, .pos = {  5, -2.0 } });
-  add_ent((Ent) { .art = Art_Cube, .pos = { -3, -4.0 } });
+  state->player = add_ent((Ent) { .art = Art_Ship, .pos = {  0,  2.5 } });
+  add_ent((Ent) { .art = Art_Asteroid, .pos = {  2, -3.0 } });
+  add_ent((Ent) { .art = Art_Asteroid, .pos = {  5, -2.0 } });
+  add_ent((Ent) { .art = Art_Asteroid, .pos = { -3, -4.0 } });
 
 
   sg_setup(&(sg_desc){
     .context = sapp_sgcontext()
   });
 
-  /* a vertex buffer */
-  float vertices[] = {
-    -0.5, -0.5, -0.5,   1.0, 0.0, 0.0, 1.0,
-     0.5, -0.5, -0.5,   1.0, 0.0, 0.0, 1.0,
-     0.5,  0.5, -0.5,   1.0, 0.0, 0.0, 1.0,
-    -0.5,  0.5, -0.5,   1.0, 0.0, 0.0, 1.0,
-
-    -0.5, -0.5,  0.5,   0.0, 1.0, 0.0, 1.0,
-     0.5, -0.5,  0.5,   0.0, 1.0, 0.0, 1.0,
-     0.5,  0.5,  0.5,   0.0, 1.0, 0.0, 1.0,
-    -0.5,  0.5,  0.5,   0.0, 1.0, 0.0, 1.0,
-
-    -0.5, -0.5, -0.5,   0.0, 0.0, 1.0, 1.0,
-    -0.5,  0.5, -0.5,   0.0, 0.0, 1.0, 1.0,
-    -0.5,  0.5,  0.5,   0.0, 0.0, 1.0, 1.0,
-    -0.5, -0.5,  0.5,   0.0, 0.0, 1.0, 1.0,
-
-     0.5, -0.5, -0.5,    1.0, 0.5, 0.0, 1.0,
-     0.5,  0.5, -0.5,    1.0, 0.5, 0.0, 1.0,
-     0.5,  0.5,  0.5,    1.0, 0.5, 0.0, 1.0,
-     0.5, -0.5,  0.5,    1.0, 0.5, 0.0, 1.0,
-
-    -0.5, -0.5, -0.5,   0.0, 0.5, 1.0, 1.0,
-    -0.5, -0.5,  0.5,   0.0, 0.5, 1.0, 1.0,
-     0.5, -0.5,  0.5,   0.0, 0.5, 1.0, 1.0,
-     0.5, -0.5, -0.5,   0.0, 0.5, 1.0, 1.0,
-
-    -0.5,  0.5, -0.5,   1.0, 0.0, 0.5, 1.0,
-    -0.5,  0.5,  0.5,   1.0, 0.0, 0.5, 1.0,
-     0.5,  0.5,  0.5,   1.0, 0.0, 0.5, 1.0,
-     0.5,  0.5, -0.5,   1.0, 0.0, 0.5, 1.0
-  };
-  sg_buffer vbuf = sg_make_buffer(&(sg_buffer_desc){
-    .data = SG_RANGE(vertices),
-    .label = "cube-vertices"
-  });
-  state->bind.vertex_buffers[0] = sg_make_buffer(&(sg_buffer_desc){
-    .data = SG_RANGE(vertices),
-    .label = "cube-vertices"
-  });
-
-  /* an index buffer with 2 triangles */
-   uint16_t indices[] = {
-     0, 1, 2,  0, 2, 3,
-     6, 5, 4,  7, 6, 4,
-     8, 9, 10,  8, 10, 11,
-     14, 13, 12,  15, 14, 12,
-     16, 17, 18,  16, 18, 19,
-     22, 21, 20,  23, 22, 20
-   };
-   sg_buffer ibuf = sg_make_buffer(&(sg_buffer_desc){
-     .type = SG_BUFFERTYPE_INDEXBUFFER,
-     .data = SG_RANGE(indices),
-     .label = "cube-indices"
-   });
-  state->bind.index_buffer = sg_make_buffer(&(sg_buffer_desc){
-    .type = SG_BUFFERTYPE_INDEXBUFFER,
-    .data = SG_RANGE(indices),
-    .label = "cube-indices"
-  });
+  load_mesh("./Bob.obj", Art_Ship);
+  load_mesh("./Asteroid.obj", Art_Asteroid);
+ 
 
   /* a shader (use separate shader sources here */
   sg_shader shd = sg_make_shader(cube_shader_desc(sg_query_backend()));
@@ -181,69 +164,70 @@ void init(void) {
     .layout = {
       .attrs = {
         [ATTR_vs_position].format = SG_VERTEXFORMAT_FLOAT3,
-        [ATTR_vs_color0].format   = SG_VERTEXFORMAT_FLOAT4
+        [ATTR_vs_uv].format      = SG_VERTEXFORMAT_FLOAT2,
+        [ATTR_vs_normal].format   = SG_VERTEXFORMAT_FLOAT3,
       }
     },
     .shader = shd,
     .index_type = SG_INDEXTYPE_UINT16,
-    .cull_mode = SG_CULLMODE_FRONT,
+    .cull_mode = SG_CULLMODE_BACK,
     .depth = {
       .write_enabled = true,
       .compare = SG_COMPAREFUNC_LESS_EQUAL,
     },
-    .label = "cube-pipeline"
   }); 
 
-  /* default pass action */
-  state->bind = (sg_bindings) {
-    .vertex_buffers[0] = vbuf,
-    .index_buffer = ibuf
-  };
-  state->pass_action = (sg_pass_action) {
-    .colors[0] = { .action=SG_ACTION_CLEAR, .value={0.0f, 0.0f, 0.0f, 1.0f } }
-  };
 }
 
-static void draw_cube(Mat4 vp, Mat4 model) {
+static void draw_mesh(Mat4 vp, Mat4 model, Art art) {
+  state->bind.index_buffer = meshes[art].ibuf;
+  state->bind.vertex_buffers[0] = meshes[art].vbuf;
+  sg_apply_bindings(&state->bind);
   vs_params_t vs_params = { .mvp = mul4x4(vp, model) };
   sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_vs_params, &SG_RANGE(vs_params));
-  sg_draw(0, 36, 1);
+  sg_draw(0, meshes[art].index_count, 1);
 }
 
+
 static void frame(void) {
+  //Player input
+  if(input_key_down(SAPP_KEYCODE_LEFT))
+    state->player->angle-=0.05f;
+  if(input_key_down(SAPP_KEYCODE_RIGHT))
+    state->player->angle+=0.05f;
+  Vec2 p_dir = vec2_rot(state->player->angle);
+  float t = p_dir.x;
+  p_dir.x = p_dir.y;
+  p_dir.y = t;
+  if(input_key_down(SAPP_KEYCODE_UP))
+  {
+    state->player->pos.x+=p_dir.x*0.2f;
+    state->player->pos.y+=p_dir.y*0.2f;
+  }
+  if(input_key_down(SAPP_KEYCODE_DOWN))
+  {
+    state->player->pos.x-=p_dir.x*0.2f;
+    state->player->pos.y-=p_dir.y*0.2f;
+  }
+
   const float w = sapp_widthf();
   const float h = sapp_heightf();
   Mat4 proj = perspective4x4(1.047f, w/h, 0.01f, 50.0f);
-  Mat4 view = look_at4x4(vec3(0.0f, 3.5f, 6.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
+  Mat4 view = look_at4x4(vec3(state->player->pos.x-p_dir.x*5.0f, 5.0f,state->player->pos.y-p_dir.y*10.0f), vec3(state->player->pos.x, 0.0f, state->player->pos.y), vec3(0.0f, 1.0f, 0.0f));
   Mat4 vp = mul4x4(proj, view);
 
   sg_pass_action pass_action = {
-    .colors[0] = { .action = SG_ACTION_CLEAR, .value = { 0.25f, 0.5f, 0.75f, 1.0f } }
+    .colors[0] = { .action = SG_ACTION_CLEAR, .value = { 0.25f/20.0, 0.25f/20.0, 0.75f/20.0, 1.0f } }
   };
   sg_begin_default_pass(&pass_action, (int)w, (int)h);
+
   sg_apply_pipeline(state->pip);
-  sg_apply_bindings(&state->bind);
   /* naively render with n draw calls per entity
    * TODO: optimize for fewer draw calls */
-  for (Ent *ent = 0; ent = ent_all_iter(ent); ) {
-    switch (ent->art) {
-      case Art_Cube: {
-        Mat4 m = translate4x4(vec3(ent->pos.x, 0.5f, ent->pos.y));
-        draw_cube(vp, m);
-      } break;
-      case Art_Ship: {
-        Mat4 m = translate4x4(vec3(ent->pos.x, 0.0f, ent->pos.y));
-        m = mul4x4(m, scale4x4(vec3(1.0f, 0.3f, 1.0f)));
-        m = mul4x4(m, rotate4x4(vec3_y, 0.78f));
-        draw_cube(vp, m);
-        m = translate4x4(vec3(ent->pos.x+0.35, 0.0f, ent->pos.y));
-        m = mul4x4(m, scale4x4(vec3(0.2f, 0.4f, 1.4f)));
-        draw_cube(vp, m);
-        m = translate4x4(vec3(ent->pos.x-0.35, 0.0f, ent->pos.y));
-        m = mul4x4(m, scale4x4(vec3(0.2f, 0.4f, 1.4f)));
-        draw_cube(vp, m);
-      } break;
-    }
+  for (Ent *ent = 0; (ent = ent_all_iter(ent));) {
+    Mat4 m = translate4x4(vec3(ent->pos.x, 0.0f, ent->pos.y));
+    m = mul4x4(m, rotate4x4(vec3_y, ent->angle));
+    draw_mesh(vp, m, ent->art);
   }
   sg_end_pass();
   sg_commit();
@@ -273,6 +257,7 @@ static void event(const sapp_event *ev) {
     case SAPP_EVENTTYPE_MOUSE_UP: {
         input_mouse_update(ev->mouse_button,0);
     } break;
+    default:;
   }
 }
 
