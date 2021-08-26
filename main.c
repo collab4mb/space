@@ -267,6 +267,12 @@ static void event(const sapp_event *ev) {
     case SAPP_EVENTTYPE_KEY_UP: {
         input_key_update(ev->key_code,0);
     } break;
+    case SAPP_EVENTTYPE_MOUSE_DOWN: {
+        input_mouse_update(ev->mouse_button,1);
+    } break;
+    case SAPP_EVENTTYPE_MOUSE_UP: {
+        input_mouse_update(ev->mouse_button,0);
+    } break;
   }
 }
 
