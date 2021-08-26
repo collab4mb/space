@@ -46,8 +46,14 @@ typedef struct {
   uint64_t props[(EntProp_COUNT + 63) / 64];
 
   Vec2 pos;
-  Art art;
+  Vec2 vel;
+
+  //Store both direction and angle, to maybe not need to recalculate the direction
+  //everytime its needed
+  Vec2 dir;
   float angle;
+  Art art;
+  float size;
 } Ent;
 static inline bool has_ent_prop(Ent *ent, EntProp prop) {
   return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
@@ -104,6 +110,8 @@ static inline Ent *ent_all_iter(Ent *ent) {
   return NULL;
 }
 
+#include "player.h"
+
 static struct {
   sg_buffer ibuf, vbuf;
   size_t id;
@@ -143,9 +151,10 @@ void init(void) {
   state = calloc(sizeof(State), 1);
 
   state->player = add_ent((Ent) { .art = Art_Ship, .pos = {  0,  2.5 } });
-  add_ent((Ent) { .art = Art_Asteroid, .pos = {  2, -3.0 } });
-  add_ent((Ent) { .art = Art_Asteroid, .pos = {  5, -2.0 } });
-  add_ent((Ent) { .art = Art_Asteroid, .pos = { -3, -4.0 } });
+  state->player->size = 2.0f;
+  add_ent((Ent) { .art = Art_Asteroid, .pos = {  2, -3.0 } })->size = 2.0f;
+  add_ent((Ent) { .art = Art_Asteroid, .pos = {  5, -2.0 } })->size = 2.0f;
+  add_ent((Ent) { .art = Art_Asteroid, .pos = { -3, -4.0 } })->size = 2.0f;
 
 
   sg_setup(&(sg_desc){
@@ -190,30 +199,12 @@ static void draw_mesh(Mat4 vp, Mat4 model, Art art) {
 
 
 static void frame(void) {
-  //Player input
-  if(input_key_down(SAPP_KEYCODE_LEFT))
-    state->player->angle-=0.05f;
-  if(input_key_down(SAPP_KEYCODE_RIGHT))
-    state->player->angle+=0.05f;
-  Vec2 p_dir = vec2_rot(state->player->angle);
-  float t = p_dir.x;
-  p_dir.x = p_dir.y;
-  p_dir.y = t;
-  if(input_key_down(SAPP_KEYCODE_UP))
-  {
-    state->player->pos.x+=p_dir.x*0.2f;
-    state->player->pos.y+=p_dir.y*0.2f;
-  }
-  if(input_key_down(SAPP_KEYCODE_DOWN))
-  {
-    state->player->pos.x-=p_dir.x*0.2f;
-    state->player->pos.y-=p_dir.y*0.2f;
-  }
+  player_update(state->player);
 
   const float w = sapp_widthf();
   const float h = sapp_heightf();
   Mat4 proj = perspective4x4(1.047f, w/h, 0.01f, 50.0f);
-  Mat4 view = look_at4x4(vec3(state->player->pos.x-p_dir.x*5.0f, 5.0f,state->player->pos.y-p_dir.y*10.0f), vec3(state->player->pos.x, 0.0f, state->player->pos.y), vec3(0.0f, 1.0f, 0.0f));
+  Mat4 view = look_at4x4(vec3(state->player->pos.x-state->player->dir.x*5.0f, 5.0f,state->player->pos.y-state->player->dir.y*10.0f), vec3(state->player->pos.x, 0.0f, state->player->pos.y), vec3(0.0f, 1.0f, 0.0f));
   Mat4 vp = mul4x4(proj, view);
 
   sg_pass_action pass_action = {
