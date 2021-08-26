@@ -180,14 +180,14 @@ void init(void) {
       float dist = ASTEROID_FIRST_RING_START_DIST;
       dist += r*ASTEROID_RING_SPACING;
 
-      float t = (float)i / (float)ASTEROIDS_PER_RING;
+      float t = (float)i / (float)ASTEROIDS_PER_RING * PI_f * 2.0f;
       t += randf() * (PI_f * 2.0f * dist) / (float) ASTEROIDS_PER_RING;
 
       dist += ASTEROID_DIST_RANDOMIZER * (0.5f - randf()) * 2.0f;
 
       Ent *ast = add_ent((Ent) {
         .art = Art_Asteroid,
-        .pos = mul2_f(vec2_rot(t * PI_f * 2.0), dist),
+        .pos = mul2_f(vec2_rot(t), dist),
       });
       ast->passive_rotate_axis = rand3();
       give_ent_prop(ast, EntProp_PassiveRotate);
