@@ -40,6 +40,9 @@ typedef enum {
   /* A bit of motion makes asteroids & co. feel more alive */
   EntProp_PassiveRotate,
 
+  /* Dictates whether the entity should disappear on collision */
+  EntProp_Projectile,
+
   /* Knowing how many EntProps there are facilitates allocating just enough memory */
   EntProp_COUNT,
 } EntProp;

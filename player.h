@@ -10,9 +10,21 @@ static void player_update(Ent *player) {
   state->player->angle += angle_delta;
   state->player_turn_accel += angle_delta;
   state->player_turn_accel *= 0.8;
+  Vec2 p_dir = vec2_swap(vec2_rot(player->angle));
+
+  if (input_key_pressed(SAPP_KEYCODE_SPACE)) {
+    Ent *e = add_ent((Ent) {
+      .art = Art_Asteroid,
+      .pos = add2(player->pos,mul2_f(p_dir,2.5f)),//mul2_f(vec2_rot(t), dist),
+      .vel = add2(player->vel,mul2_f(p_dir,0.6f)),
+      .scale_delta = -0.8f,
+      .size = 0.2f,
+      .weight = 1.0f,
+    });
+    give_ent_prop(e, EntProp_Projectile);
+  }
 
   // TODO: take precautions to prevent movement from being tied to framerate
-  Vec2 p_dir = vec2_swap(vec2_rot(player->angle));
   float dir = 0.0f;
   if (input_key_down(SAPP_KEYCODE_UP))   dir =  1.0f;
   if (input_key_down(SAPP_KEYCODE_DOWN)) dir = -1.0f;
