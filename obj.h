@@ -108,7 +108,12 @@ static void _obj_skip(Parser *self) {
 static bool _obj_isfloat(Parser *self) {
   _obj_skip(self);
   char *end = (char*)self->src;
+
+  // Todo(bumbread): don't waste time parsing the float,
+  // just forward scan for the '.' symbol, or use state-based
+  // automation.
   strtod(self->src, &end);
+  
   return end != self->src;
 }
 

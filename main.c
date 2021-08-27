@@ -11,6 +11,10 @@
 #define SOKOL_GLCORE33
 #endif
 
+#ifndef __GNUC__
+#define __attribute__(unused)
+#endif
+
 #define SOKOL_WIN32_FORCE_MAIN
 #include "sokol/sokol_app.h"
 #define CUTE_PNG_IMPLEMENTATION
