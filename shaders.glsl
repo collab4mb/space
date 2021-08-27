@@ -1,34 +1,90 @@
 @ctype mat4 Mat4
+@ctype vec4 Vec4
 
 @vs vs
 uniform vs_params {
-    mat4 mvp;
+    mat4 view_proj;
+    mat4 model;
 };
 
 in vec3 position;
 in vec2 uv;
 in vec3 normal;
 
-out vec4 color;
+out vec3 light;
+out vec2 fs_uv;
 
 void main() {
-  vec3 lightsource = normalize(vec3(0.1, 1.0, 0.2));
-  gl_Position = mvp * vec4(position, 1.0);
-  float intensity = dot(normal, lightsource)*0.7;
-  color = vec4(intensity, intensity, intensity, 1.0);
-  color = color+vec4(0.0, 0.2, 0.3, 0.0);
-  color.r += uv.x*0.001;
+  gl_Position = view_proj * model * vec4(position, 1.0);
+  fs_uv = uv;
+
+  // vec3 frag_pos = vec3(model * vec4(position, 1));
+  vec3 fs_normal = mat3(transpose(inverse(model))) * normal;
+
+  vec3 light_dir = -normalize(vec3(0.1, -1.0, 0.3));
+  vec3 light_color = vec3(1.0);
+
+  // ambient
+  float ambient_strength = 0.1;
+  vec3 ambient = ambient_strength * light_color;
+
+  // diffuse 
+  vec3 norm = normalize(fs_normal);
+  float diff = max(dot(norm, light_dir), 0.0);
+  vec3 diffuse = diff * light_color;
+
+  // specular
+  // float specular_strength = 0.5;
+  // vec3 view_dir = normalize(viewPos - frag_pos);
+  // vec3 reflect_dir = reflect(-light_dir, norm);
+  // float spec = pow(max(dot(view_dir, reflect_dir), 0.0), 32);
+  // vec3 specular = specular_strength * spec * light_color;
+  float specular = 0.0;
+
+  light = ambient + diffuse + specular;
 }
 @end
 
 @fs fs
-in vec4 color;
+uniform sampler2D tex;
+
+in vec3 light;
+in vec2 fs_uv;
+
 out vec4 frag_color;
 
 void main() {
-    frag_color = color;
+  vec3 object_color = vec3(texture(tex, fs_uv));
+  frag_color = vec4(object_color * light, 1);
 }
 @end
 
-@program cube vs fs
+@program mesh vs fs
 
+// ---------------------------------------------------- //
+
+@vs overlay_vs
+uniform overlay_vs_params {
+    vec4 color;
+    mat4 mvp;
+};
+
+in vec2 position;
+out vec4 fs_color;
+
+void main() {
+  fs_color = color;
+  gl_Position = mvp * vec4(position, -0.1, 1.0);
+}
+@end
+
+@fs overlay_fs
+out vec4 frag_color;
+in vec4 fs_color;
+
+void main() {
+  frag_color = fs_color;
+}
+@end
+
+@program overlay overlay_vs overlay_fs
