@@ -1,2 +1,8 @@
 -xc
 -include main.c
+-Wall
+-Wextra
+-pedantic
+-Werror
+-Wconversion
+-Wno-implicit-conversion

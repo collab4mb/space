@@ -22,6 +22,9 @@
 #include "sokol/sokol_gfx.h"
 #include "sokol/sokol_glue.h"
 
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+
 #include <math.h>
 #include "math.h"
 #include "fio.h"
@@ -150,6 +153,7 @@ static struct {
 } meshes[Art_COUNT] = { 0 };
 
 ol_Image test_image;
+ol_Font test_font;
 
 void load_mesh(const char *path, const char *texture, Art art) {
   char *input = fio_read_text(path);
@@ -252,7 +256,8 @@ void init(void) {
 
   load_mesh("./Bob.obj", "./Bob_Orange.png", Art_Ship);
   load_mesh("./Asteroid.obj", "./Moon.png", Art_Asteroid);
- 
+
+  test_font = ol_load_font("./Orbitron-Regular.ttf");
 
   /* a shader use separate shader sources here */
   sg_shader shd = sg_make_shader(mesh_shader_desc(sg_query_backend()));
@@ -354,7 +359,21 @@ static void frame(void) {
     if (txt[i] == '#')
       ol_draw_rect(vec4(1.0, i/(float)l, 0.0, 1.0), (ol_Rect) {(i%8)*10, (i/8)*10, 10, 10});
       */
-  ol_draw_tex_part(&test_image, (ol_Rect) {100, 100, 208, 72}, (ol_Rect) {0, 0, 208/2, 72});
+  const char *text = "To begin, approach an asteroid and press [SPACE]";
+  ol_Rect rect = ol_measure_text(&test_font, text, 20, 30);
+  rect.x -= 40;
+  rect.y -= 40;
+  rect.w += 80;
+  rect.h += 80;
+  rect.x += 40;
+  rect.y += 40;
+  ol_draw_rect(vec4(0.1, 0.2, 0.3, 0.4), rect);
+  rect.x += 10;
+  rect.y += 10;
+  rect.w -= 20;
+  rect.h -= 20;
+  ol_draw_rect(vec4(0.1, 0.2, 0.3, 0.4), rect);
+  ol_draw_text(&test_font, text, 60, 70, vec4(0.4, 0.8, 1.0, 1.0));
 
   sg_end_pass();
   sg_commit();
