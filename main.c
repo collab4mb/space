@@ -172,11 +172,30 @@ void load_mesh(const char *path, const char *texture, Art art) {
   cp_image_t player_png = cp_load_png(texture);
   cp_flip_image_horizontal(&player_png);
   state->bind.index_buffer = ibuf;
-  meshes[art].texture = sg_make_image(&(sg_image_desc){
-    .width = player_png.w,
-    .height = player_png.h,
-    .data.subimage[0][0] = (sg_range){ player_png.pix,player_png.w*player_png.h*sizeof(cp_pixel_t) } ,
-  });
+  int w = player_png.w;
+  int h = player_png.h;
+  if (art == Art_Ship)
+    meshes[art].texture = sg_make_image_with_mipmaps(&(sg_image_desc){
+      .width = w,
+      .height = h,
+      .pixel_format = SG_PIXELFORMAT_RGBA8,
+      .num_mipmaps = 10,
+      .min_filter = SG_FILTER_LINEAR_MIPMAP_LINEAR,
+      .mag_filter = SG_FILTER_LINEAR,
+      .max_anisotropy = 8,
+      .wrap_u = SG_WRAP_CLAMP_TO_EDGE,
+      .wrap_v = SG_WRAP_CLAMP_TO_EDGE,
+      .data.subimage[0][0] = (sg_range){ player_png.pix,w*h*sizeof(cp_pixel_t) } ,
+    });
+  else 
+    meshes[art].texture = sg_make_image(&(sg_image_desc){
+      .width = w,
+      .height = h,
+      .max_anisotropy = 8,
+      .min_filter = SG_FILTER_LINEAR,
+      .mag_filter = SG_FILTER_LINEAR,
+      .data.subimage[0][0] = (sg_range){ player_png.pix, w*h*sizeof(cp_pixel_t) } ,
+    });
   cp_free_png(&player_png);
   meshes[art].ibuf = ibuf; meshes[art].vbuf = vbuf; 
   meshes[art].id = art; meshes[art].index_count = res.index_count;
@@ -206,7 +225,7 @@ void init(void) {
       dist += r*ASTEROID_RING_SPACING;
 
       float t = (float)i / (float)ASTEROIDS_PER_RING * PI_f * 2.0f;
-      t += randf() * (PI_f * 2.0f * dist) / (float) ASTEROIDS_PER_RING;
+      t += randf() * (PI_f * 2.0f * dist) / (float) ASTEROIDS_PER_RING * 0.8;
 
       dist += ASTEROID_DIST_RANDOMIZER * (0.5f - randf()) * 2.0f;
 
@@ -259,7 +278,7 @@ static void draw_mesh(Mat4 vp, Mat4 model, Art art) {
   state->bind.index_buffer = meshes[art].ibuf;
   state->bind.vertex_buffers[0] = meshes[art].vbuf;
   sg_apply_bindings(&state->bind);
-  vs_params_t vs_params = { .mvp = mul4x4(vp, model), .model = model };
+  vs_params_t vs_params = { .view_proj = vp, .model = model };
   sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_vs_params, &SG_RANGE(vs_params));
   sg_draw(0, meshes[art].index_count, 1);
 }
@@ -310,7 +329,7 @@ static void frame(void) {
 
     m = mul4x4(m, scale4x4(vec3_f(1.0f+ent->scale_delta)));
 
-    // m = mul4x4(m, art_tweaks[ent->art]);
+    m = mul4x4(m, art_tweaks[ent->art]);
     draw_mesh(vp, m, ent->art);
   }
 
