@@ -115,6 +115,8 @@ static struct {
   size_t index_count;
 } meshes[Art_COUNT] = { 0 };
 
+sg_image test_image;
+
 void load_mesh(const char *path, const char *texture, Art art) {
   char *input = fio_read_text(path);
   if (input == NULL) {
@@ -126,7 +128,6 @@ void load_mesh(const char *path, const char *texture, Art art) {
   obj_Unrolled unrolled = obj_unroll_pun(&res, &vertex_count);
   obj_dispose(&res);
   
-
   /* a vertex buffer */
   sg_buffer vbuf = sg_make_buffer(&(sg_buffer_desc){
     .data = (sg_range){unrolled.vertices, vertex_count*8*sizeof(float)},
@@ -157,6 +158,7 @@ void load_mesh(const char *path, const char *texture, Art art) {
 void init(void) {
   state = calloc(sizeof(State), 1);
 
+
   state->player = add_ent((Ent) { .art = Art_Ship, .pos = {  0,  2.5 } });
   for (int i = 0; i < 100; i += 1) {
     add_ent((Ent) { .art = Art_Asteroid, .angle = (rand()%314)/314.0, .pos = {  rand()%1000-500, rand()%1000-500 }, .scale_delta = (rand()%20)/3.0 });
@@ -171,6 +173,14 @@ void init(void) {
   load_mesh("./Bob.obj", "./Bob_Orange.png", Art_Ship);
   load_mesh("./Asteroid.obj", "./Moon.png", Art_Asteroid);
  
+  cp_image_t png = cp_load_png("./test_tex.png");
+ // cp_flip_image_horizontal(&png);
+  test_image = sg_make_image(&(sg_image_desc){
+    .width = png.w,
+    .height = png.h,
+    .data.subimage[0][0] = (sg_range){ png.pix,png.w*png.h*sizeof(cp_pixel_t) } ,
+  });
+  cp_free_png(&png);
 
   /* a shader use separate shader sources here */
   sg_shader shd = sg_make_shader(mesh_shader_desc(sg_query_backend()));
@@ -258,6 +268,7 @@ static void frame(void) {
   for (size_t i = 0; i < l; i += 1)
     if (txt[i] == '#')
       ol_draw_rect(vec4(1.0, i/(float)l, 0.0, 1.0), (i%8)*10, (i/8)*10, 10, 10);
+  ol_draw_tex(test_image, 0, 100, 208, 72);
 
   sg_end_pass();
   sg_commit();

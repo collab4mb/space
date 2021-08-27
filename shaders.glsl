@@ -43,25 +43,26 @@ void main() {
 
 @vs overlay_vs
 uniform overlay_vs_params {
-    vec4 color;
     mat4 mvp;
 };
 
 in vec2 position;
-out vec4 fs_color;
+in vec2 uv;
+out vec2 fs_uv;
 
 void main() {
-  fs_color = color;
+  fs_uv = uv;
   gl_Position = mvp * vec4(position, -0.1, 1.0);
 }
 @end
 
 @fs overlay_fs
+uniform sampler2D tex;
 out vec4 frag_color;
-in vec4 fs_color;
+in vec2 fs_uv;
 
 void main() {
-  frag_color = fs_color;
+  frag_color = texture(tex, fs_uv);
 }
 @end
 
