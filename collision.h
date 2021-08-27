@@ -31,22 +31,30 @@ static void collision(Ent *ac) {
 
     float nscale_delta = old.scale_delta-0.3f;
     if(old.scale_delta>-0.4f) {
-      add_ent((Ent) {
-        .art = Art_Asteroid,
+      Ent *ne = add_ent((Ent) {
+        .art = old.art,
         .pos = add2_f(old.pos,old.size/2.0f),
         .vel = old.vel,
         .scale_delta = nscale_delta,
         .size = 1.0f+nscale_delta,
         .weight = 1.0f,
       });
-      add_ent((Ent) {
-        .art = Art_Asteroid,
+      if(has_ent_prop(&old,EntProp_PassiveRotate)) {
+        give_ent_prop(ne,EntProp_PassiveRotate);
+        ne->passive_rotate_axis = rand3();
+      }
+      ne = add_ent((Ent) {
+        .art = old.art,
         .pos = sub2_f(old.pos,old.size/2.0f),
         .vel = mul2_f(old.vel,-1.0f),
         .scale_delta = nscale_delta,
         .size = 1.0f+nscale_delta,
         .weight = 1.0f,
       });
+      if(has_ent_prop(&old,EntProp_PassiveRotate)) {
+        give_ent_prop(ne,EntProp_PassiveRotate);
+        ne->passive_rotate_axis = rand3();
+      }
     }
   }
 }
