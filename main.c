@@ -40,8 +40,10 @@ typedef enum {
   /* A bit of motion makes asteroids & co. feel more alive */
   EntProp_PassiveRotate,
 
-  /* Dictates whether the entity should disappear on collision */
+  /* Dictates whether the entity should disappear on collision and doesn't have friction*/
   EntProp_Projectile,
+  
+  EntProp_Destructible,
 
   /* Knowing how many EntProps there are facilitates allocating just enough memory */
   EntProp_COUNT,
@@ -241,6 +243,7 @@ void init(void) {
       });
       ast->passive_rotate_axis = rand3();
       give_ent_prop(ast, EntProp_PassiveRotate);
+      give_ent_prop(ast, EntProp_Destructible);
     }
 
   sg_setup(&(sg_desc){

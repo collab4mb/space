@@ -15,7 +15,7 @@ static void player_update(Ent *player) {
   if (input_key_pressed(SAPP_KEYCODE_SPACE)) {
     Ent *e = add_ent((Ent) {
       .art = Art_Asteroid,
-      .pos = add2(player->pos,mul2_f(p_dir,2.5f)),//mul2_f(vec2_rot(t), dist),
+      .pos = add2(player->pos,mul2_f(p_dir,2.5f)),
       .vel = add2(player->vel,mul2_f(p_dir,0.6f)),
       .scale_delta = -0.8f,
       .size = 0.2f,
