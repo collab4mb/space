@@ -47,6 +47,12 @@ typedef enum {
   /* A bit of motion makes asteroids & co. feel more alive */
   EntProp_PassiveRotate,
 
+  /* Projectiles disappear on collision and are exempt from friction */
+  EntProp_Projectile,
+  
+  /* Allows entities to lose health and be destroyed */
+  EntProp_Destructible,
+
   /* Knowing how many EntProps there are facilitates allocating just enough memory */
   EntProp_COUNT,
 } EntProp;
@@ -84,7 +90,7 @@ typedef struct {
   Art art;
 
   float size, weight;
-  float scale_delta;
+  float scale;
 } Ent;
 static inline bool has_ent_prop(Ent *ent, EntProp prop) {
   return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
@@ -241,12 +247,13 @@ void init(void) {
       Ent *ast = add_ent((Ent) {
         .art = Art_Asteroid,
         .pos = mul2_f(vec2_rot(t), dist),
-        .scale_delta = -r * (0.1f + 0.2f * randf()),
+        .scale = 1.0 + r * (0.1f + 0.2f * randf()),
         .size = 1.0f,
         .weight = 1.0f,
+        .passive_rotate_axis = rand3(),
       });
-      ast->passive_rotate_axis = rand3();
       give_ent_prop(ast, EntProp_PassiveRotate);
+      give_ent_prop(ast, EntProp_Destructible);
     }
 
   sg_setup(&(sg_desc){
@@ -339,7 +346,8 @@ static void frame(void) {
       m = mul4x4(m, rotate4x4(ent->passive_rotate_axis,
                               ent->passive_rotate_angle += 0.01));
 
-    m = mul4x4(m, scale4x4(vec3_f(1.0f+ent->scale_delta)));
+    float scale = (ent->scale == 0.0f) ? 1.0f : ent->scale;
+    m = mul4x4(m, scale4x4(vec3_f(scale)));
 
     m = mul4x4(m, art_tweaks[ent->art]);
     draw_mesh(vp, m, ent->art);
