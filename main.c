@@ -212,6 +212,7 @@ void init(void) {
   seed_rand(9, 12, 32, 10);
 
   state = calloc(sizeof(State), 1);
+
   state->player = add_ent((Ent) {
     .art = Art_Ship,
     .pos = { -1, 2.5 },
@@ -252,7 +253,6 @@ void init(void) {
   load_mesh("./Bob.obj", "./Bob_Orange.png", Art_Ship);
   load_mesh("./Asteroid.obj", "./Moon.png", Art_Asteroid);
  
-  test_image = ol_load_image("./test_tex.png");
 
   /* a shader use separate shader sources here */
   sg_shader shd = sg_make_shader(mesh_shader_desc(sg_query_backend()));
@@ -276,6 +276,8 @@ void init(void) {
       .compare = SG_COMPAREFUNC_LESS_EQUAL,
     },
   }); 
+
+  test_image = ol_load_image("./test_tex.png");
 }
 
 static void draw_mesh(Mat4 vp, Mat4 model, Art art) {
@@ -347,11 +349,12 @@ static void frame(void) {
     ".######.";
   
   size_t l = strlen(txt);
-
+/*
   for (size_t i = 0; i < l; i += 1)
     if (txt[i] == '#')
       ol_draw_rect(vec4(1.0, i/(float)l, 0.0, 1.0), (ol_Rect) {(i%8)*10, (i/8)*10, 10, 10});
-  ol_draw_tex(&test_image, (ol_Rect) {100, 100, 208, 72});
+      */
+  ol_draw_tex_part(&test_image, (ol_Rect) {100, 100, 208, 72}, (ol_Rect) {0, 0, 208/2, 72});
 
   sg_end_pass();
   sg_commit();

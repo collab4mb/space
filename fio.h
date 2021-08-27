@@ -3,7 +3,7 @@
 
 __attribute__((unused))
 static char* fio_read_text(const char *path) {
-  FILE *f = fopen(path, "r");
+  FILE *f = fopen(path, "rb");
   if (f == NULL)
     return NULL;
   fseek(f, 0, SEEK_END);

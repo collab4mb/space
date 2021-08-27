@@ -86,19 +86,20 @@ ol_Image ol_load_image(const char *path) {
     .height = png.h,
     .data.subimage[0][0] = (sg_range){ png.pix,w*h*sizeof(cp_pixel_t) } ,
   });
-  cp_free_png(&png);
-  return (ol_Image) {
+  ol_Image res = {
     .width = png.w,
     .height = png.h,
     .sg = img
   };
+  cp_free_png(&png);
+  return res;
 }
 
 void ol_begin() {
   sg_apply_pipeline(_ol_state.pip);
 }
 
-void ol_draw_tex(ol_Image *img, ol_Rect r) {
+void ol_draw_tex_part(ol_Image *img, ol_Rect r, ol_Rect part) {
   _ol_state.bind.index_buffer = _ol_state.quad_shape.ibuf;
   _ol_state.bind.vertex_buffers[0] = _ol_state.quad_shape.vbuf;
   _ol_state.bind.fs_images[SLOT_tex] = img->sg;
@@ -106,11 +107,18 @@ void ol_draw_tex(ol_Image *img, ol_Rect r) {
   const float sw = sapp_widthf();
   const float sh = sapp_heightf();
   overlay_vs_params_t overlay_vs_params = { 
+    .minuv = vec2(part.x/(float)img->width, part.y/(float)img->height),
+    .sizuv = vec2(part.w/(float)img->width, part.h/(float)img->height),
     .mvp = mul4x4(mul4x4(ortho4x4(sw, sh, 0.01, 100.0), translate4x4(vec3(-1.0+(float)r.x*2/sw, 1.0-(float)r.y*2/sh, 0.0))), scale4x4(vec3(r.w, r.h, 1.0)))
   };
   sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_overlay_vs_params, &SG_RANGE(overlay_vs_params));
   sg_draw(0, _ol_state.quad_shape.index_count, 1);
 }
+
+void ol_draw_tex(ol_Image *img, ol_Rect r) {
+  ol_draw_tex_part(img, r, (ol_Rect) { 0, 0, img->width, img->height });
+}
+
 
 void ol_draw_rect(Vec4 color, ol_Rect rect) {
   const uint8_t pixel[4] = { (uint8_t)(color.x*255), (uint8_t)(color.y*255), (uint8_t)(color.z*255), (uint8_t)(color.w*255) }; 
