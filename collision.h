@@ -26,46 +26,26 @@ static void collision(Ent *ac) {
     }
   }
 
-  if(ent!=NULL&&
-     has_ent_prop(ent,EntProp_Destructible)&&
-     has_ent_prop(ac,EntProp_Projectile)) {
-    take_ent_prop(ac,EntProp_Active);
+  if (ent != NULL
+      && has_ent_prop(ent, EntProp_Destructible)
+      && has_ent_prop(ac,  EntProp_Projectile)) {
+    take_ent_prop(ac, EntProp_Active);
     Ent old = *ent;
-    take_ent_prop(ent,EntProp_Active);
-
-    float nscale_delta = old.scale_delta-0.3f;
+    take_ent_prop(ent, EntProp_Active);
 
     //TODO: somehow dictate what should happen if a entity gets destroyed/dies (just vanish, split, spawn a different entity etc)
     //For now, just create two smaller asteroids in place of the old one.
-    if(old.scale_delta>-0.4f) {
-      //TODO: move asteroid creation to a separate function, also move in init()
-      Ent *ne = add_ent((Ent) {
-        .art = old.art,
-        .pos = add2_f(old.pos,old.size/2.0f),
-        .vel = old.vel,
-        .scale_delta = nscale_delta,
-        .size = 1.0f+nscale_delta,
-        .weight = 1.0f,
-      });
-      give_ent_prop(ne, EntProp_Destructible);
-      if(has_ent_prop(&old,EntProp_PassiveRotate)) {
-        give_ent_prop(ne,EntProp_PassiveRotate);
-        ne->passive_rotate_axis = rand3();
+    if (old.scale > 0.4f)
+      for (int i = 0; i < 2; i++) {
+        float sign = i ? -1.0f : 1.0f;
+        Ent *ne = add_ent(old);
+        ne->pos = add2_f(old.pos, old.size/2.0f * sign);
+        ne->vel = mul2_f(old.vel, sign);
+        ne->scale -= 0.3f;
+        ne->size -= 0.3f;
+        if (has_ent_prop(ne, EntProp_PassiveRotate))
+          ne->passive_rotate_axis = rand3();
       }
-      ne = add_ent((Ent) {
-        .art = old.art,
-        .pos = sub2_f(old.pos,old.size/2.0f),
-        .vel = mul2_f(old.vel,-1.0f),
-        .scale_delta = nscale_delta,
-        .size = 1.0f+nscale_delta,
-        .weight = 1.0f,
-      });
-      give_ent_prop(ne, EntProp_Destructible);
-      if(has_ent_prop(&old,EntProp_PassiveRotate)) {
-        give_ent_prop(ne,EntProp_PassiveRotate);
-        ne->passive_rotate_axis = rand3();
-      }
-    }
   }
 }
 

@@ -17,7 +17,7 @@ static void player_update(Ent *player) {
       .art = Art_Asteroid,
       .pos = add2(player->pos,mul2_f(p_dir,2.5f)),
       .vel = add2(player->vel,mul2_f(p_dir,0.6f)),
-      .scale_delta = -0.8f,
+      .scale = 0.2f,
       .size = 0.2f,
       .weight = 1.0f,
     });
