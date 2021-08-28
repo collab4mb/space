@@ -214,6 +214,7 @@ int ol_draw_text(ol_Font *font, const char *text, int x, int y, Vec4 modulate) {
   for (;*text; text += 1) {
     stride += ol_draw_glyph(font, *text, x+stride, y, modulate);
   }
+  return stride;
 }
 
 #undef ATLAS_SIZE
