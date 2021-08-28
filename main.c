@@ -75,6 +75,14 @@ typedef struct {
   float size, weight;
 } Collider;
 
+typedef struct {
+  int tick;
+  const AI_state *state;
+  AI_type type;
+  struct Entity *target;
+  uint64_t target_gen;
+}AI;
+
 /* A game entity. Usually, it is rendered somewhere and has some sort of dynamic behavior */
 typedef struct Entity {
   /* packed into 64 bit sections for alignment */
@@ -101,12 +109,7 @@ typedef struct Entity {
   Art art;
 
   Collider collider;
-
-  int ai_tick;
-  const AI_state *ai_state;
-  AI_type ai_type;
-  struct Entity *ai_target;
-  uint64_t ai_target_gen;
+  AI ai;
 } Ent;
 static inline bool has_ent_prop(Ent *ent, EntProp prop) {
   return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
