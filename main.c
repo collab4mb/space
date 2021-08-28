@@ -80,6 +80,8 @@ typedef struct Entity {
   /* packed into 64 bit sections for alignment */
   uint64_t props[(EntProp_COUNT + 63) / 64];
 
+  uint64_t generation;
+
   Vec2 pos, vel;
   float height;
   Vec3 scale;
@@ -101,14 +103,17 @@ typedef struct Entity {
   Collider collider;
 
   int ai_tick;
-  AI_state *ai_state;
+  const AI_state *ai_state;
   AI_type ai_type;
   struct Entity *ai_target;
+  uint64_t ai_target_gen;
 } Ent;
 static inline bool has_ent_prop(Ent *ent, EntProp prop) {
   return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
 }
 static inline bool take_ent_prop(Ent *ent, EntProp prop) {
+  if(prop==EntProp_Active)
+    ent->generation++;
   bool before = has_ent_prop(ent, prop);
   ent->props[prop/64] &= ~((uint64_t)1 << (prop%64));
   return before;
@@ -148,7 +153,9 @@ static Ent *add_ent(Ent ent) {
   for (int i = 0; i < STATE_MAX_ENTS; i++) {
     Ent *slot = state->ents + i;
     if (!has_ent_prop(slot, EntProp_Active)) {
+      uint64_t gen = slot->generation;
       *slot = ent;
+      slot->generation = gen;
       give_ent_prop(slot, EntProp_Active);
       return slot;
     }
@@ -301,6 +308,14 @@ void init(void) {
   Ent *en = add_ent((Ent) {
     .art = Art_Ship,
     .pos = { -1, 12.5 },
+    .collider.size = 2.0f,
+    .collider.weight = 0.4f,
+  });
+  give_ent_prop(en,EntProp_HasAI);
+  ai_init(en,AI_TYPE_DSHIP);
+  en = add_ent((Ent) {
+    .art = Art_Ship,
+    .pos = { -10, 12.5 },
     .collider.size = 2.0f,
     .collider.weight = 0.4f,
   });
