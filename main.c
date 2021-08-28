@@ -81,6 +81,7 @@ typedef struct {
   AI_type type;
   struct Entity *target;
   uint64_t target_gen;
+  uint64_t tick_end;
 }AI;
 
 /* A game entity. Usually, it is rendered somewhere and has some sort of dynamic behavior */

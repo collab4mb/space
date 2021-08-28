@@ -11,7 +11,8 @@
 typedef enum {
   AI_STATE_SHIP_IDLE,
   AI_STATE_SHIP_MOVE,
-  AI_STATE_SHIP_ATTACK,
+  AI_STATE_SHIP_ATTACK0,
+  AI_STATE_SHIP_ATTACK1,
   AI_STATE_MAX,
 }AI_statenum;
 
@@ -29,6 +30,7 @@ typedef void (*_ai_func_p1)(void *);
 typedef struct {
   AI_statenum next;
   _ai_func_p1 action;
+  uint64_t ticks;
 }AI_state;
 
 //Used for looking up basic states for a given entity.
@@ -46,8 +48,10 @@ static void ai_init(void *param0, AI_type type);
 static void ai_run(void *param0);
 static void _ai_idle(void *param0);
 static void _ai_move(void *param0);
+static void _ai_attack_idle(void *param0);
 static void _ai_attack(void *param0);
-static void _ai_set_state(void *param0, AI_statenum state);
+static void _ai_set_state(void *param0, AI_statenum nstate);
+static void _ai_run_state(void *param0);
 //-------------------------------------
 
 //Variables
@@ -55,9 +59,10 @@ static void _ai_set_state(void *param0, AI_statenum state);
 //This array will contain the possible states of every possible ai type.
 //Having this in a central place allows for easy tweaking of AI behaviour.
 static const AI_state _ai_state[AI_STATE_MAX] = {
-  { .next = AI_STATE_SHIP_IDLE, .action = _ai_idle, }, //STATE_SHIP_IDLE
-  { .next = AI_STATE_SHIP_MOVE, .action = _ai_move, }, //STATE_SHIP_MOVE
-  { .next = AI_STATE_SHIP_ATTACK, .action = _ai_attack, }, //STATE_SHIP_ATTACK
+  { .next = AI_STATE_SHIP_IDLE, .action = _ai_idle, .ticks = 1},            //STATE_SHIP_IDLE
+  { .next = AI_STATE_SHIP_MOVE, .action = _ai_move, .ticks = 1},            //STATE_SHIP_MOVE
+  { .next = AI_STATE_SHIP_ATTACK1, .action = _ai_attack_idle, .ticks = 30}, //STATE_SHIP_ATTACK0
+  { .next = AI_STATE_SHIP_ATTACK0, .action = _ai_attack, .ticks = 1},       //STATE_SHIP_ATTACK1
 };
 
 static const AI_info _ai_entinfo[AI_TYPE_MAX] = {
@@ -65,7 +70,7 @@ static const AI_info _ai_entinfo[AI_TYPE_MAX] = {
   {
     .state_idle = AI_STATE_SHIP_IDLE,
     .state_move = AI_STATE_SHIP_MOVE,
-    .state_attack = AI_STATE_SHIP_ATTACK,
+    .state_attack = AI_STATE_SHIP_ATTACK0,
   },
 };
 //-------------------------------------
