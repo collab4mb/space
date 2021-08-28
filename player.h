@@ -17,9 +17,10 @@ static void player_update(Ent *player) {
       .art = Art_Asteroid,
       .pos = add2(player->pos,mul2_f(p_dir,2.5f)),
       .vel = add2(player->vel,mul2_f(p_dir,0.6f)),
-      .scale = 0.2f,
-      .size = 0.2f,
-      .weight = 1.0f,
+      .scale = vec3_f(0.2f),
+      .height = -0.8,
+      .collider.size = 0.2f,
+      .collider.weight = 1.0f,
     });
     give_ent_prop(e, EntProp_Projectile);
   }
