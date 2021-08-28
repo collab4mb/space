@@ -67,9 +67,9 @@ static void collision(Ent *ac) {
   if (ent != NULL
       && has_ent_prop(ent, EntProp_Destructible)
       && has_ent_prop(ac,  EntProp_Projectile)) {
-    take_ent_prop(ac, EntProp_Active);
+    remove_ent(ac);
     Ent old = *ent;
-    take_ent_prop(ent, EntProp_Active);
+    remove_ent(ent);
 
     // TODO: somehow dictate what should happen if a entity gets destroyed/dies (just vanish, split, spawn a different entity etc)
     // For now, just create two smaller asteroids in place of the old one.
@@ -104,7 +104,7 @@ static void collision_movement_update(Ent *ac) {
     // target (the player most likely won't be able to see the distant collision anyway).
     ac->collider.weight -= 0.01f;
     if(ac->collider.weight < 0.0f)
-      take_ent_prop(ac, EntProp_Active);
+      remove_ent(ac);
   }
   else {
     ac->vel = mul2_f(ac->vel, 0.96f);

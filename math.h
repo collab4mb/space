@@ -40,6 +40,7 @@ typedef union {
 //Utillity
 static float to_radians(float degrees);
 static float lerp(float a, float b, float t);
+static float lerp_rad(float a, float b, float t);
 static float sign(float f);
 static float step(float edge, float x);
 static uint32_t rand32(void);
@@ -136,6 +137,12 @@ static float to_radians(float degrees) {
 
 static float lerp(float a, float b, float t) {
   return (1.0f-t)*a+t*b;
+}
+
+static float lerp_rad(float a, float b, float t) {
+  float difference = fmodf(b - a, PI_f*2.0f),
+        distance = fmodf(2.0f * difference, PI_f*2.0f) - difference;
+  return a + distance * t;
 }
 
 static float sign(float f) {

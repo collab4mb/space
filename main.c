@@ -35,6 +35,10 @@
 #include "build/shaders.glsl.h"
 #include "overlay.h"
 
+//The list of enums/states will be getting bigger as we add more entities,
+//so move it to its own file
+#include "ai_type.h"
+
 /* EntProps enable codepaths for game entities.
    These aren't boolean fields because that makes it more difficult to deal with
    them dynamically; this way you can have a function which gives you all Ents
@@ -56,6 +60,9 @@ typedef enum {
   /* Drags this entity toward the player, and makes it disappear when it gets there */
   EntProp_PickUp,
 
+  /* runs the ai statemachine on the entity*/
+  EntProp_HasAI,
+
   /* Knowing how many EntProps there are facilitates allocating just enough memory */
   EntProp_COUNT,
 } EntProp;
@@ -68,10 +75,25 @@ typedef struct {
   float size, weight;
 } Collider;
 
-/* A game entity. Usually, it is rendered somewhere and has some sort of dynamic behavior */
 typedef struct {
+  uint64_t generation;
+  struct Ent *index;
+}GenDex;
+
+typedef struct {
+  int tick;
+  const AI_state *state;
+  AI_type type;
+  GenDex target;
+  uint64_t tick_end;
+}AI;
+
+/* A game entity. Usually, it is rendered somewhere and has some sort of dynamic behavior */
+typedef struct Ent{
   /* packed into 64 bit sections for alignment */
   uint64_t props[(EntProp_COUNT + 63) / 64];
+
+  uint64_t generation;
 
   Vec2 pos, vel;
   float height;
@@ -92,6 +114,7 @@ typedef struct {
   Art art;
 
   Collider collider;
+  AI ai;
 } Ent;
 static inline bool has_ent_prop(Ent *ent, EntProp prop) {
   return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
@@ -105,6 +128,17 @@ static inline bool give_ent_prop(Ent *ent, EntProp prop) {
   bool before = has_ent_prop(ent, prop);
   ent->props[prop/64] |= (uint64_t)1 << (prop%64);
   return before;
+}
+
+static GenDex get_gendex(Ent *ent) {
+  return (GenDex) { .generation = ent->generation, .index = ent };
+}
+
+/* returns NULL if gendex is stale */
+static Ent* try_gendex(GenDex gd) {
+  //Original code by cedric (not valid C):
+  //return gd.index * (gd.index->generation == gd.generation);
+  return ((gd.index->generation==gd.generation)&&gd.index!=NULL)?gd.index:NULL;
 }
 
 typedef enum { Shader_Standard, Shader_ForceField, Shader_COUNT } Shader;
@@ -136,12 +170,19 @@ static Ent *add_ent(Ent ent) {
   for (int i = 0; i < STATE_MAX_ENTS; i++) {
     Ent *slot = state->ents + i;
     if (!has_ent_prop(slot, EntProp_Active)) {
+      uint64_t gen = slot->generation;
       *slot = ent;
+      slot->generation = gen;
       give_ent_prop(slot, EntProp_Active);
       return slot;
     }
   }
   return NULL;
+}
+
+static void remove_ent(Ent *ent) {
+  ent->generation++;
+  take_ent_prop(ent,EntProp_Active);
 }
 
 /* Use this function to iterate over all of the Ents in the game.
@@ -162,6 +203,7 @@ static inline Ent *ent_all_iter(Ent *ent) {
 
 #include "collision.h"
 #include "player.h"
+#include "ai.h"
 
 ol_Image test_image;
 ol_Font test_font;
@@ -285,6 +327,23 @@ void init(void) {
     .context = sapp_sgcontext()
   });
 
+  Ent *en = add_ent((Ent) {
+    .art = Art_Ship,
+    .pos = { -1, 12.5 },
+    .collider.size = 2.0f,
+    .collider.weight = 0.4f,
+  });
+  give_ent_prop(en,EntProp_HasAI);
+  ai_init(en,AI_TYPE_DSHIP);
+  en = add_ent((Ent) {
+    .art = Art_Ship,
+    .pos = { -10, 12.5 },
+    .collider.size = 2.0f,
+    .collider.weight = 0.4f,
+  });
+  give_ent_prop(en,EntProp_HasAI);
+  ai_init(en,AI_TYPE_DSHIP);
+
 
   load_mesh(    Art_Ship,   Shader_Standard,     "./Bob.obj", "./Bob_Orange.png");
   load_mesh(Art_Asteroid,   Shader_Standard,"./Asteroid.obj",       "./Moon.png");
@@ -376,6 +435,9 @@ static void frame(void) {
 
   player_update(state->player);
   for (Ent *ent = 0; (ent = ent_all_iter(ent));)
+    if(has_ent_prop(ent,EntProp_HasAI))
+      ai_run(ent);
+  for (Ent *ent = 0; (ent = ent_all_iter(ent));)
     collision(ent);
   for (Ent *ent = 0; (ent = ent_all_iter(ent));) {
     collision_movement_update(ent);
@@ -390,7 +452,7 @@ static void frame(void) {
         float dist = mag2(delta);
 
         if (dist < 0.3f)
-          take_ent_prop(ent, EntProp_Active);
+          remove_ent(ent);
         else if (dist < SUCK_DIST)
           ent->pos = add2(
             ent->pos,
