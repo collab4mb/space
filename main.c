@@ -19,6 +19,7 @@
 #include "sokol/sokol_app.h"
 #define CUTE_PNG_IMPLEMENTATION
 #include "cute_png.h"
+#include "sokol/sokol_time.h"
 #include "sokol/sokol_gfx.h"
 #include "sokol/sokol_glue.h"
 
@@ -159,7 +160,8 @@ typedef struct {
   Ent ents[STATE_MAX_ENTS];
   Ent *player;
   float player_turn_accel;
-  uint64_t tick;
+  uint64_t frame, tick;
+  double fixed_tick_accumulator;
 } State;
 static State *state;
 
@@ -323,6 +325,7 @@ void init(void) {
       give_ent_prop(ast, EntProp_Destructible);
     }
 
+  stm_setup();
   sg_setup(&(sg_desc){
     .context = sapp_sgcontext()
   });
@@ -429,8 +432,7 @@ static void draw_ent(Mat4 vp, Ent *ent) {
   sg_draw(0, mesh->index_count, 1);
 }
 
-
-static void frame(void) {
+static void tick(void) {
   state->tick++;
 
   player_update(state->player);
@@ -460,6 +462,15 @@ static void frame(void) {
           );
       }
     }
+  }
+}
+
+static void frame(void) {
+  #define TICK_MS (1000.0f / 60.0f)
+  state->fixed_tick_accumulator += stm_ms(stm_laptime(&state->frame));
+  while (state->fixed_tick_accumulator > TICK_MS) {
+    state->fixed_tick_accumulator -= TICK_MS;
+    tick();
   }
 
   const float w = sapp_widthf();
