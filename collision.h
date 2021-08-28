@@ -31,6 +31,8 @@ static void collision(Ent *ac) {
 
   ac->time_since_last_collision += 0.001f;
 
+  if (ac->collider.size == 0.0f) return;
+
   Ent *ent = NULL;
 
   for (ent = 0; (ent = ent_all_iter(ent));) {
@@ -38,6 +40,7 @@ static void collision(Ent *ac) {
 
     // We can just check the pointers here to see if they are the same entity
     if (ent == ac) continue;
+    if (ent->collider.size == 0.0f) continue;
 
     float depth = 0.0f;
     Vec2 normal = { 0 };
@@ -68,16 +71,24 @@ static void collision(Ent *ac) {
     Ent old = *ent;
     take_ent_prop(ent, EntProp_Active);
 
-    //TODO: somehow dictate what should happen if a entity gets destroyed/dies (just vanish, split, spawn a different entity etc)
-    //For now, just create two smaller asteroids in place of the old one.
-    if (magmag3(old.scale) > 0.4f*0.4f)
+    // TODO: somehow dictate what should happen if a entity gets destroyed/dies (just vanish, split, spawn a different entity etc)
+    // For now, just create two smaller asteroids in place of the old one.
       for (int i = 0; i < 2; i++) {
         float sign = i ? -1.0f : 1.0f;
-        Ent *ne = add_ent(old);
+        Ent *ne;
+        if (old.collider.size > 0.4f) {
+          ne = add_ent(old);
+          ne->scale = sub3_f(ne->scale, 0.3f);
+          ne->collider.size -= 0.3f;
+        } else {
+          ne = add_ent((Ent) { .art = Art_Mineral });
+          ne->pick_up_after_tick = state->tick + 10;
+          give_ent_prop(ne, EntProp_PickUp);
+        }
+
         ne->pos = add2_f(old.pos, old.collider.size/2.0f * sign);
         ne->vel = mul2_f(old.vel, sign);
-        ne->scale = sub3_f(ne->scale, 0.3f);
-        ne->collider.size -= 0.3f;
+
         if (has_ent_prop(ne, EntProp_PassiveRotate))
           ne->passive_rotate_axis = rand3();
       }

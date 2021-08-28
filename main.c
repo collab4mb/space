@@ -53,11 +53,14 @@ typedef enum {
   /* Allows entities to lose health and be destroyed */
   EntProp_Destructible,
 
+  /* Drags this entity toward the player, and makes it disappear when it gets there */
+  EntProp_PickUp,
+
   /* Knowing how many EntProps there are facilitates allocating just enough memory */
   EntProp_COUNT,
 } EntProp;
 
-typedef enum { Art_Ship, Art_Asteroid, Art_Plane, Art_COUNT } Art;
+typedef enum { Art_Ship, Art_Asteroid, Art_Plane, Art_Mineral, Art_COUNT } Art;
 
 typedef enum { Shape_Circle, Shape_Line } Shape;
 typedef struct {
@@ -82,6 +85,9 @@ typedef struct {
   /* tied to EntProp_PassiveRotate */
   Vec3 passive_rotate_axis;
   float passive_rotate_angle;
+
+  /* tied to EntProp_PickUp */
+  uint64_t pick_up_after_tick;
 
   Art art;
 
@@ -119,6 +125,7 @@ typedef struct {
   Ent ents[STATE_MAX_ENTS];
   Ent *player;
   float player_turn_accel;
+  uint64_t tick;
 } State;
 static State *state;
 
@@ -282,6 +289,7 @@ void init(void) {
   load_mesh(    Art_Ship,   Shader_Standard,     "./Bob.obj", "./Bob_Orange.png");
   load_mesh(Art_Asteroid,   Shader_Standard,"./Asteroid.obj",       "./Moon.png");
   load_mesh(   Art_Plane, Shader_ForceField,   "./Plane.obj",               NULL);
+  load_mesh( Art_Mineral,   Shader_Standard, "./Mineral.obj",    "./Mineral.png");
 
   test_font = ol_load_font("./Orbitron-Regular.ttf");
 
@@ -364,11 +372,33 @@ static void draw_ent(Mat4 vp, Ent *ent) {
 
 
 static void frame(void) {
+  state->tick++;
+
   player_update(state->player);
   for (Ent *ent = 0; (ent = ent_all_iter(ent));)
     collision(ent);
-  for (Ent *ent = 0; (ent = ent_all_iter(ent));)
+  for (Ent *ent = 0; (ent = ent_all_iter(ent));) {
     collision_movement_update(ent);
+
+    if (has_ent_prop(ent, EntProp_PickUp)) {
+      ent->height = sinf(ent->pos.x + ent->pos.y + (float) state->tick / 14.0) * 0.3f;
+      if (ent->pick_up_after_tick <= state->tick) {
+        Ent *p = state->player;
+
+        #define SUCK_DIST (6.0f)
+        Vec2 delta = sub2(p->pos, ent->pos);
+        float dist = mag2(delta);
+
+        if (dist < 0.3f)
+          take_ent_prop(ent, EntProp_Active);
+        else if (dist < SUCK_DIST)
+          ent->pos = add2(
+            ent->pos,
+            mul2_f(norm2(delta), (SUCK_DIST - dist) / 20.0f)
+          );
+      }
+    }
+  }
 
   const float w = sapp_widthf();
   const float h = sapp_heightf();
