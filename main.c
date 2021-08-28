@@ -76,16 +76,20 @@ typedef struct {
 } Collider;
 
 typedef struct {
+  uint64_t generation;
+  struct Ent *index;
+}GenDex;
+
+typedef struct {
   int tick;
   const AI_state *state;
   AI_type type;
-  struct Entity *target;
-  uint64_t target_gen;
+  GenDex target;
   uint64_t tick_end;
 }AI;
 
 /* A game entity. Usually, it is rendered somewhere and has some sort of dynamic behavior */
-typedef struct Entity {
+typedef struct Ent{
   /* packed into 64 bit sections for alignment */
   uint64_t props[(EntProp_COUNT + 63) / 64];
 
@@ -126,6 +130,17 @@ static inline bool give_ent_prop(Ent *ent, EntProp prop) {
   bool before = has_ent_prop(ent, prop);
   ent->props[prop/64] |= (uint64_t)1 << (prop%64);
   return before;
+}
+
+static GenDex get_gendex(Ent *ent) {
+  return (GenDex) { .generation = ent->generation, .index = ent };
+}
+
+/* returns NULL if gendex is stale */
+static Ent* try_gendex(GenDex gd) {
+  //Original code by cedric (not valid C):
+  //return gd.index * (gd.index->generation == gd.generation);
+  return ((gd.index->generation==gd.generation)&&gd.index!=NULL)?gd.index:NULL;
 }
 
 typedef enum { Shader_Standard, Shader_ForceField, Shader_COUNT } Shader;
