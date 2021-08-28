@@ -63,6 +63,61 @@ void main() {
 
 // ---------------------------------------------------- //
 
+@vs force_field_vs
+uniform vs_params {
+  mat4 view_proj;
+  mat4 model;
+};
+
+in vec3 position;
+in vec2 uv;
+
+out vec2 fs_uv;
+
+void main() {
+  gl_Position = view_proj * model * vec4(position, 1.0);
+  fs_uv = uv;
+}
+@end
+
+@fs force_field_fs
+in vec2 fs_uv;
+
+out vec4 frag_color;
+
+uniform force_field_fs_params {
+  vec2 stretch;
+  float time; /* set to zero when something hits force field */
+};
+
+float hex(vec2 p) {
+  p.x *= 0.57735*2.0;
+  p.y += mod(floor(p.x), 2.0)*0.5;
+  p = abs((mod(p, 1.0) - 0.5));
+  return smoothstep(1.0, 0.1, abs(max(p.x*1.5 + p.y, p.y*2.0) - 1.0) / 0.38);
+}
+void main() {
+  vec2 uv = fs_uv;
+  float center = 1.0 - 2.0*abs(uv.x - 0.5);
+  center = smoothstep(0.0, 1.0, center);
+  uv *= stretch;
+
+  float ttime = time * 3.6;
+  float pt = fs_uv.x + sin(fs_uv.y*80.0)*(ttime+0.1)*0.1;
+  float bang = abs(abs(0.5 - pt) - ttime*3.0) / 0.085;
+  bang = smoothstep(1.0, 0.0, bang);
+  uv.x += bang * 0.1;
+  uv.y += sin(bang + uv.x) * 0.1;
+
+  float d = (hex(uv * 2.0) + bang * 0.4) * center;
+  frag_color = vec4(1, 0, 1, 1) * d * 0.7;
+}
+@end
+
+@program force_field force_field_vs force_field_fs
+
+// ---------------------------------------------------- //
+
 @vs overlay_vs
 uniform overlay_vs_params {
     vec4 color;
