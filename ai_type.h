@@ -24,11 +24,15 @@ typedef enum {
 
 typedef void (*_ai_func_p1)(void *);
 
+//'next' defines to what state the entity should switch after this state is over (TODO: implement time limit for states)
+//'action' gets called every frame for an entity and defines its behaviour, can change its state
 typedef struct {
   AI_statenum next;
   _ai_func_p1 action;
 }AI_state;
 
+//Used for looking up basic states for a given entity.
+//This allows for the creation of more generalized ai functions.
 typedef struct {
   AI_statenum state_idle;
   AI_statenum state_move;
@@ -47,6 +51,9 @@ static void _ai_set_state(void *param0, AI_statenum state);
 //-------------------------------------
 
 //Variables
+
+//This array will contain the possible states of every possible ai type.
+//Having this in a central place allows for easy tweaking of AI behaviour.
 static const AI_state _ai_state[AI_STATE_MAX] = {
   { .next = AI_STATE_SHIP_IDLE, .action = _ai_idle, }, //STATE_SHIP_IDLE
   { .next = AI_STATE_SHIP_MOVE, .action = _ai_move, }, //STATE_SHIP_MOVE
@@ -54,7 +61,8 @@ static const AI_state _ai_state[AI_STATE_MAX] = {
 };
 
 static const AI_info _ai_entinfo[AI_TYPE_MAX] = {
-  { //AI_TYPE_DSHIP
+  //AI_TYPE_DSHIP
+  {
     .state_idle = AI_STATE_SHIP_IDLE,
     .state_move = AI_STATE_SHIP_MOVE,
     .state_attack = AI_STATE_SHIP_ATTACK,
