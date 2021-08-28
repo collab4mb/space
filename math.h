@@ -544,6 +544,15 @@ static Mat4 ortho4x4(
   return res;
 }
 
+static Mat4 shear2d4x4(float x, float y) {
+  return (Mat4) {{
+    { 1.0, y, 0.0, 0.0 },
+    { x, 1.0, 0.0, 0.0 },
+    { 0.0, 0.0, 1.0, 0.0 },
+    { 0.0, 0.0, 0.0, 1.0 },
+  }};
+}
+
 #endif
 #endif
 #endif

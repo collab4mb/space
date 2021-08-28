@@ -22,6 +22,9 @@
 #include "sokol/sokol_gfx.h"
 #include "sokol/sokol_glue.h"
 
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+
 #include <math.h>
 #include "math.h"
 #include "fio.h"
@@ -153,6 +156,8 @@ static inline Ent *ent_all_iter(Ent *ent) {
 #include "collision.h"
 #include "player.h"
 
+ol_Image test_image;
+ol_Font test_font;
 
 void load_texture(Art art, const char *texture) {
   cp_image_t player_png = cp_load_png(texture);
@@ -277,7 +282,8 @@ void init(void) {
   load_mesh(    Art_Ship,   Shader_Standard,     "./Bob.obj", "./Bob_Orange.png");
   load_mesh(Art_Asteroid,   Shader_Standard,"./Asteroid.obj",       "./Moon.png");
   load_mesh(   Art_Plane, Shader_ForceField,   "./Plane.obj",               NULL);
- 
+
+  test_font = ol_load_font("./Orbitron-Regular.ttf");
 
 
   ol_init();
@@ -311,6 +317,8 @@ void init(void) {
 
   desc.shader = sg_make_shader(force_field_shader_desc(sg_query_backend()));
   state->pip[Shader_ForceField] = sg_make_pipeline(&desc);
+
+  test_image = ol_load_image("./test_tex.png");
 }
 
 /* naively renders with n draw calls per entity
@@ -391,6 +399,24 @@ static void frame(void) {
       if (state->meshes[ent->art].shader == shd)
         draw_ent(vp, ent);
   }
+
+  ol_begin();
+
+  const char *text = "To begin, approach an asteroid and press [SPACE]";
+  ol_Rect rect = ol_measure_text(&test_font, text, 20, 30);
+  rect.x -= 40;
+  rect.y -= 40;
+  rect.w += 80;
+  rect.h += 80;
+  rect.x += 40;
+  rect.y += 40;
+  ol_draw_rect(vec4(0.1, 0.2, 0.3, 0.4), rect);
+  rect.x += 10;
+  rect.y += 10;
+  rect.w -= 20;
+  rect.h -= 20;
+  ol_draw_rect(vec4(0.1, 0.2, 0.3, 0.4), rect);
+  ol_draw_text(&test_font, text, 60, 70, vec4(0.4, 0.8, 1.0, 1.0));
 
   sg_end_pass();
   sg_commit();

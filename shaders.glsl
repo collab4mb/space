@@ -1,5 +1,6 @@
 @ctype mat4 Mat4
 @ctype vec4 Vec4
+@ctype vec2 Vec2
 
 @vs vs
 uniform vs_params {
@@ -120,25 +121,40 @@ void main() {
 
 @vs overlay_vs
 uniform overlay_vs_params {
-    vec4 color;
-    mat4 mvp;
+  float istxt;
+  vec2 minuv;
+  vec2 sizuv;
+  mat4 mvp;
+  vec4 modulate;
 };
 
 in vec2 position;
-out vec4 fs_color;
+in vec2 uv;
+out vec2 fs_uv;
+out vec4 fs_modulate;
+out float fs_istxt;
 
 void main() {
-  fs_color = color;
+  fs_istxt = istxt;
+  fs_modulate = modulate;
+  fs_uv = uv*sizuv+minuv;
   gl_Position = mvp * vec4(position, -0.1, 1.0);
 }
 @end
 
 @fs overlay_fs
+uniform sampler2D tex;
 out vec4 frag_color;
-in vec4 fs_color;
+in vec2 fs_uv;
+in vec4 fs_modulate;
+in float fs_istxt;
 
 void main() {
-  frag_color = fs_color;
+  vec4 color = texture(tex, fs_uv);
+  if (fs_istxt > 0.5) {
+    color = vec4(color.r, color.r, color.r, color.r);
+  }
+  frag_color = color*fs_modulate;
 }
 @end
 
