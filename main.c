@@ -120,8 +120,6 @@ static inline bool has_ent_prop(Ent *ent, EntProp prop) {
   return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
 }
 static inline bool take_ent_prop(Ent *ent, EntProp prop) {
-  if(prop==EntProp_Active)
-    ent->generation++;
   bool before = has_ent_prop(ent, prop);
   ent->props[prop/64] &= ~((uint64_t)1 << (prop%64));
   return before;
@@ -180,6 +178,11 @@ static Ent *add_ent(Ent ent) {
     }
   }
   return NULL;
+}
+
+static void remove_ent(Ent *ent) {
+  ent->generation++;
+  take_ent_prop(ent,EntProp_Active);
 }
 
 /* Use this function to iterate over all of the Ents in the game.
@@ -449,7 +452,7 @@ static void frame(void) {
         float dist = mag2(delta);
 
         if (dist < 0.3f)
-          take_ent_prop(ent, EntProp_Active);
+          remove_ent(ent);
         else if (dist < SUCK_DIST)
           ent->pos = add2(
             ent->pos,
