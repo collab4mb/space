@@ -10,6 +10,8 @@
 //Typedefs
 typedef enum {
   AI_STATE_SHIP_IDLE,
+  AI_STATE_SHIP_MOVE,
+  AI_STATE_SHIP_ATTACK,
   AI_STATE_MAX,
 }AI_statenum;
 
@@ -20,24 +22,16 @@ typedef enum {
   AI_TYPE_MAX,
 }AI_type;
 
-typedef void (*func_p0)();
 typedef void (*func_p1)(void *);
-typedef void (*func_p2)(void *, void *);
-
-typedef union {
-  func_p0 p0; 
-  func_p1 p1; 
-  func_p2 p2; 
-}AI_action;
 
 typedef struct {
   AI_statenum next;
-  AI_action action;
+  func_p1 action;
 }AI_state;
 
 typedef struct {
-  AI_statenum state_spawn;
-  AI_statenum state_see;
+  AI_statenum state_idle;
+  AI_statenum state_move;
   AI_statenum state_attack;
   AI_statenum state_death;
 }AI_info;
@@ -47,17 +41,23 @@ typedef struct {
 static void ai_init(void *param0, AI_type type);
 static void ai_run(void *param0);
 static void _ai_idle(void *param0);
+static void _ai_move(void *param0);
+static void _ai_attack(void *param0);
 static void _ai_set_state(void *param0, AI_statenum state);
 //-------------------------------------
 
 //Variables
 static AI_state _ai_state[AI_STATE_MAX] = {
-  { .next = AI_STATE_SHIP_IDLE, .action.p1 = _ai_idle, }, //STATE_SHIP_IDLE
+  { .next = AI_STATE_SHIP_IDLE, .action = _ai_idle, }, //STATE_SHIP_IDLE
+  { .next = AI_STATE_SHIP_MOVE, .action = _ai_move, }, //STATE_SHIP_MOVE
+  { .next = AI_STATE_SHIP_ATTACK, .action = _ai_attack, }, //STATE_SHIP_ATTACK
 };
 
 static AI_info _ai_entinfo[AI_TYPE_MAX] = {
-  { //ENT_TYPE_DSHIP
-    .state_spawn = AI_STATE_SHIP_IDLE,
+  { //AI_TYPE_DSHIP
+    .state_idle = AI_STATE_SHIP_IDLE,
+    .state_move = AI_STATE_SHIP_MOVE,
+    .state_attack = AI_STATE_SHIP_ATTACK,
   },
 };
 //-------------------------------------

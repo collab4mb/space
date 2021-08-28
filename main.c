@@ -76,7 +76,7 @@ typedef struct {
 } Collider;
 
 /* A game entity. Usually, it is rendered somewhere and has some sort of dynamic behavior */
-typedef struct {
+typedef struct Entity {
   /* packed into 64 bit sections for alignment */
   uint64_t props[(EntProp_COUNT + 63) / 64];
 
@@ -100,8 +100,10 @@ typedef struct {
 
   Collider collider;
 
+  int ai_tick;
   AI_state *ai_state;
   AI_type ai_type;
+  struct Entity *ai_target;
 } Ent;
 static inline bool has_ent_prop(Ent *ent, EntProp prop) {
   return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
