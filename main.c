@@ -35,6 +35,10 @@
 #include "build/shaders.glsl.h"
 #include "overlay.h"
 
+//The list of enums/states will be getting bigger as we add more entities,
+//so move it to its own file
+#include "ai_type.h"
+
 /* EntProps enable codepaths for game entities.
    These aren't boolean fields because that makes it more difficult to deal with
    them dynamically; this way you can have a function which gives you all Ents
@@ -55,6 +59,9 @@ typedef enum {
 
   /* Drags this entity toward the player, and makes it disappear when it gets there */
   EntProp_PickUp,
+
+  /* runs the ai statemachine on the entity*/
+  EntProp_HasAI,
 
   /* Knowing how many EntProps there are facilitates allocating just enough memory */
   EntProp_COUNT,
@@ -92,6 +99,9 @@ typedef struct {
   Art art;
 
   Collider collider;
+
+  AI_state *ai_state;
+  AI_type ai_type;
 } Ent;
 static inline bool has_ent_prop(Ent *ent, EntProp prop) {
   return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
@@ -162,6 +172,7 @@ static inline Ent *ent_all_iter(Ent *ent) {
 
 #include "collision.h"
 #include "player.h"
+#include "ai.h"
 
 ol_Image test_image;
 ol_Font test_font;
@@ -285,6 +296,15 @@ void init(void) {
     .context = sapp_sgcontext()
   });
 
+  Ent *en = add_ent((Ent) {
+    .art = Art_Ship,
+    .pos = { -1, 12.5 },
+    .collider.size = 2.0f,
+    .collider.weight = 0.4f,
+  });
+  give_ent_prop(en,EntProp_HasAI);
+  ai_init(en,AI_TYPE_DSHIP);
+
 
   load_mesh(    Art_Ship,   Shader_Standard,     "./Bob.obj", "./Bob_Orange.png");
   load_mesh(Art_Asteroid,   Shader_Standard,"./Asteroid.obj",       "./Moon.png");
@@ -375,6 +395,9 @@ static void frame(void) {
   state->tick++;
 
   player_update(state->player);
+  for (Ent *ent = 0; (ent = ent_all_iter(ent));)
+    if(has_ent_prop(ent,EntProp_HasAI))
+      ai_run(ent);
   for (Ent *ent = 0; (ent = ent_all_iter(ent));)
     collision(ent);
   for (Ent *ent = 0; (ent = ent_all_iter(ent));) {
