@@ -110,7 +110,7 @@ static void _ai_attack(void *param0) {
     .height = -0.8,
     .collider.size = 0.2f,
     .collider.weight = 1.0f,
-    .damage = 1,
+    .damage = ent->damage,
   });
   give_ent_prop(e, EntProp_Projectile);
 }
