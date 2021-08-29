@@ -21,6 +21,7 @@ static void player_update(Ent *player) {
       .height = -0.8,
       .collider.size = 0.2f,
       .collider.weight = 1.0f,
+      .damage = player->damage,
     });
     give_ent_prop(e, EntProp_Projectile);
   }

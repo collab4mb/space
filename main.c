@@ -115,6 +115,8 @@ typedef struct Ent{
   /* tied to EntProp_Destructible */
   int32_t health;
 
+  int32_t damage;
+
   Art art;
 
   Collider collider;
@@ -290,6 +292,7 @@ void init(void) {
     .collider.size = 2.0f,
     .collider.weight = 0.4f,
     .health = 10,
+    .damage = 1,
   });
   give_ent_prop(state->player,EntProp_Destructible);
 
@@ -344,6 +347,7 @@ void init(void) {
     .collider.size = 2.0f,
     .collider.weight = 0.4f,
     .health = 2,
+    .damage = 1,
   });
   give_ent_prop(en,EntProp_HasAI);
   give_ent_prop(en,EntProp_Destructible);
@@ -354,6 +358,7 @@ void init(void) {
     .collider.size = 2.0f,
     .collider.weight = 0.4f,
     .health = 2,
+    .damage = 1,
   });
   give_ent_prop(en,EntProp_HasAI);
   give_ent_prop(en,EntProp_Destructible);

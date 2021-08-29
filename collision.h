@@ -67,10 +67,10 @@ static void collision(Ent *ac) {
   if (ent != NULL
       && has_ent_prop(ent, EntProp_Destructible)
       && has_ent_prop(ac,  EntProp_Projectile)) {
-    remove_ent(ac);
-
     //TODO: proper damage stat
-    ent->health-=1;
+    ent->health-=ac->damage;
+
+    remove_ent(ac);
   }
 }
 
