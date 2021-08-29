@@ -26,6 +26,12 @@
 void _ai_idle(void *param0) {
   Ent *ent = (Ent *)param0;
 
+  //Die
+  if(ent->health<=0) {
+    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_death);
+    return;
+  }
+
   if(magmag2(sub2(ent->pos,state->player->pos))<m_square(50.0f)&&
      dot2(vec2_swap(vec2_rot(ent->angle)),norm2(sub2(state->player->pos,ent->pos))) > 0.5) {
     ent->ai.target = get_gendex(state->player);
@@ -46,6 +52,12 @@ static void _ai_static_idle(void *param0) {
 static void _ai_move(void *param0) {
   Ent *ent = (Ent *)param0;
   Ent *target = try_gendex(ent->ai.target);
+
+  //Die
+  if(ent->health<=0) {
+    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_death);
+    return;
+  }
 
   //If target has been destroyed, revert to being idle
   if(target==NULL) {
@@ -76,6 +88,12 @@ static void _ai_attack(void *param0) {
   Ent *ent = (Ent *)param0;
   Ent *target = try_gendex(ent->ai.target);
 
+  //Die
+  if(ent->health<=0) {
+    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_death);
+    return;
+  }
+
   //If target has been destroyed, revert to being idle
   if(target==NULL) {
     _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_idle);
@@ -86,7 +104,7 @@ static void _ai_attack(void *param0) {
   Vec2 e_dir = vec2_swap(vec2_rot(ent->angle));
   Ent *e = add_ent((Ent) {
     .art = Art_Asteroid,
-    .pos = add2(ent->pos,mul2_f(e_dir,2.2f)),
+    .pos = add2(ent->pos,mul2_f(e_dir,2.5f)),
     .vel = add2(ent->vel,mul2_f(e_dir,0.6f)),
     .scale = vec3_f(0.2f),
     .height = -0.8,
@@ -99,6 +117,12 @@ static void _ai_attack(void *param0) {
 static void _ai_attack_idle(void *param0) {
   Ent *ent = (Ent *)param0;
   Ent *target = try_gendex(ent->ai.target);
+
+  //Die
+  if(ent->health<=0) {
+    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_death);
+    return;
+  }
 
   //If target has been destroyed, revert to being idle
   if(target==NULL) {
@@ -138,6 +162,24 @@ static void _ai_death_split(void *param0) {
       ne->pick_up_after_tick = state->tick + 10;
       give_ent_prop(ne, EntProp_PickUp);
     }
+
+    ne->pos = add2_f(old.pos, old.collider.size/2.0f * sign);
+    ne->vel = mul2_f(old.vel, sign);
+  }
+
+  remove_ent(ent);
+}
+
+static void _ai_death_loot(void *param0) {
+  Ent *ent = (Ent *)param0;
+
+  Ent old = *ent;
+  for (int i = 0; i < 2; i++) {
+    float sign = i ? -1.0f : 1.0f;
+    Ent *ne;
+    ne = add_ent((Ent) { .art = Art_Mineral });
+    ne->pick_up_after_tick = state->tick + 10;
+    give_ent_prop(ne, EntProp_PickUp);
 
     ne->pos = add2_f(old.pos, old.collider.size/2.0f * sign);
     ne->vel = mul2_f(old.vel, sign);

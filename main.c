@@ -341,16 +341,20 @@ void init(void) {
     .pos = { -1, 12.5 },
     .collider.size = 2.0f,
     .collider.weight = 0.4f,
+    .health = 2,
   });
   give_ent_prop(en,EntProp_HasAI);
+  give_ent_prop(en,EntProp_Destructible);
   ai_init(en,AI_TYPE_DSHIP);
   en = add_ent((Ent) {
     .art = Art_Ship,
     .pos = { -10, 12.5 },
     .collider.size = 2.0f,
     .collider.weight = 0.4f,
+    .health = 2,
   });
   give_ent_prop(en,EntProp_HasAI);
+  give_ent_prop(en,EntProp_Destructible);
   ai_init(en,AI_TYPE_DSHIP);
 
 
