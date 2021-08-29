@@ -289,7 +289,9 @@ void init(void) {
     .pos = { -1, 2.5 },
     .collider.size = 2.0f,
     .collider.weight = 0.4f,
+    .health = 10,
   });
+  give_ent_prop(state->player,EntProp_Destructible);
 
   add_ent((Ent) {
     .art = Art_Plane,
