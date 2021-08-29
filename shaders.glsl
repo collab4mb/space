@@ -111,6 +111,46 @@ void main() {
 @program laser laser_vs laser_fs
 
 // ---------------------------------------------------- //
+@vs particle_vs
+uniform particle_vs_params {
+    mat4 view_proj;
+};
+
+in vec3 position;
+in vec4 color;
+in vec3 inst_pos;
+in float glow;
+in float size;
+
+out vec4 fs_color;
+out float fs_bloom;
+
+void main() {
+  gl_Position = view_proj * vec4(position * size + inst_pos, 1.0);
+  fs_color = color;
+  fs_bloom = glow;
+}
+@end
+
+@fs particle_fs
+
+in vec4 fs_color;
+in float fs_bloom;
+
+layout (location = 0) out vec4 frag_color;
+layout (location = 1) out vec4 bright_color;
+
+void main() {
+  frag_color = fs_color;
+
+  float brightness = dot(fs_color.rgb, vec3(0.2126, 0.7152, 0.0722));
+  bright_color = step(1.0 - fs_bloom, fs_color);
+}
+@end
+
+@program particle particle_vs particle_fs
+
+// ---------------------------------------------------- //
 
 @vs force_field_vs
 uniform vs_params {

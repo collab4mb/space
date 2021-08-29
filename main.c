@@ -79,7 +79,7 @@ typedef struct {
 typedef struct {
   uint64_t generation;
   struct Ent *index;
-}GenDex;
+} GenDex;
 
 typedef struct {
   int tick;
@@ -162,6 +162,10 @@ typedef struct {
   uint64_t frame, tick;
   double fixed_tick_accumulator;
   struct {
+    sg_buffer vbuf, ibuf, inst_buf;
+    sg_pipeline pip;
+  } particle;
+  struct {
     sg_image color_img, bright_img, depth_img;
     sg_pass pass;
   } offscreen;
@@ -218,6 +222,8 @@ static inline Ent *ent_all_iter(Ent *ent) {
 #include "collision.h"
 #include "player.h"
 #include "ai.h"
+#include "particle.h"
+
 
 ol_Image test_image;
 ol_Font test_font;
@@ -449,6 +455,21 @@ void init(void) {
   desc.shader = sg_make_shader(force_field_shader_desc(sg_query_backend()));
   state->pip[Shader_ForceField] = sg_make_pipeline(&desc);
 
+  desc.shader = sg_make_shader(particle_shader_desc(sg_query_backend()));
+  desc.layout = (sg_layout_desc) {
+    /* vertex buffer at slot 1 must step per instance */
+    .buffers[1].step_func = SG_VERTEXSTEP_PER_INSTANCE,
+    .attrs = {
+      [ATTR_particle_vs_position] = { .format=SG_VERTEXFORMAT_FLOAT3, .buffer_index=0 },
+      [ATTR_particle_vs_color]    = { .format=SG_VERTEXFORMAT_FLOAT4, .buffer_index=1 },
+      [ATTR_particle_vs_inst_pos] = { .format=SG_VERTEXFORMAT_FLOAT3, .buffer_index=1 },
+      [ATTR_particle_vs_glow]     = { .format=SG_VERTEXFORMAT_FLOAT , .buffer_index=1 },
+      [ATTR_particle_vs_size]     = { .format=SG_VERTEXFORMAT_FLOAT , .buffer_index=1 },
+    }
+  };
+  state->particle.pip = sg_make_pipeline(&desc);
+  particle_init();
+
   test_image = ol_load_image("./test_tex.png");
 
   /* a vertex buffer to render a fullscreen rectangle */
@@ -560,11 +581,14 @@ static void tick(void) {
 
 static void frame(void) {
   #define TICK_MS (1000.0f / 60.0f)
-  state->fixed_tick_accumulator += stm_ms(stm_laptime(&state->frame));
+  float elapsed = stm_ms(stm_laptime(&state->frame));
+  state->fixed_tick_accumulator += elapsed;
   while (state->fixed_tick_accumulator > TICK_MS) {
     state->fixed_tick_accumulator -= TICK_MS;
     tick();
   }
+  /* animate non-gameplay things that aren't tick dependent */
+  particle_update(elapsed);
 
   const float w = sapp_widthf();
   const float h = sapp_heightf();
@@ -598,6 +622,15 @@ static void frame(void) {
       if (state->meshes[ent->art].shader == shd)
         draw_ent(vp, ent);
   }
+  sg_apply_pipeline(state->particle.pip);
+  sg_apply_bindings(&(sg_bindings) {
+    .vertex_buffers[0] = state->particle.vbuf,
+    .vertex_buffers[1] = state->particle.inst_buf,
+    .index_buffer = state->particle.ibuf,
+  });
+  particle_vs_params_t vs_params = { .view_proj = vp };
+  sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_particle_vs_params, &SG_RANGE(vs_params));
+  sg_draw(0, 24, particle_data.cur_num_particles);
 
   ol_begin();
 
