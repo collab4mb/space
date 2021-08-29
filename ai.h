@@ -194,23 +194,15 @@ static void _ai_set_state(void *param0, AI_statenum nstate) {
   ent->ai.state = &_ai_state[nstate];
   ent->ai.tick_end = state->tick+ent->ai.state->ticks;
 
-  do {
-    if(ent->ai.state->action!=NULL)
-      ent->ai.state->action(ent);
-    if(ent->ai.tick>0)
-      ent->ai.tick--;
-  } while(ent->ai.tick>0);
+  if(ent->ai.state->action!=NULL)
+    ent->ai.state->action(ent);
 }
 
 static void _ai_run_state(void *param0) {
   Ent *ent = (Ent *)param0;
 
-  do {
-    if(ent->ai.state->action!=NULL)
+  if(ent->ai.state->action!=NULL)
       ent->ai.state->action(ent);
-    if(ent->ai.tick>0)
-      ent->ai.tick--;
-  } while(ent->ai.tick>0);
 }
 
 static void ai_init(void *param0, AI_type type) {
@@ -225,7 +217,6 @@ static void ai_run(void *param0) {
   Ent *ent = (Ent *)param0;
   if(ent->ai.state==NULL)
     return;
-  ent->ai.tick++;
 
   if(state->tick>=ent->ai.tick_end)
     _ai_set_state(ent,ent->ai.state->next);
