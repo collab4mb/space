@@ -112,6 +112,9 @@ typedef struct Ent{
   /* tied to EntProp_PickUp */
   uint64_t pick_up_after_tick;
 
+  /* tied to EntProp_Destructible */
+  int32_t health;
+
   Art art;
 
   Collider collider;
@@ -320,9 +323,12 @@ void init(void) {
         .collider.size = 1.0f,
         .collider.weight = 1.0f,
         .passive_rotate_axis = rand3(),
+        .health = 1,
       });
       give_ent_prop(ast, EntProp_PassiveRotate);
       give_ent_prop(ast, EntProp_Destructible);
+      give_ent_prop(ast, EntProp_HasAI);
+      ai_init(ast,AI_TYPE_ASTEROID);
     }
 
   stm_setup();

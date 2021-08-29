@@ -68,30 +68,9 @@ static void collision(Ent *ac) {
       && has_ent_prop(ent, EntProp_Destructible)
       && has_ent_prop(ac,  EntProp_Projectile)) {
     remove_ent(ac);
-    Ent old = *ent;
-    remove_ent(ent);
 
-    // TODO: somehow dictate what should happen if a entity gets destroyed/dies (just vanish, split, spawn a different entity etc)
-    // For now, just create two smaller asteroids in place of the old one.
-      for (int i = 0; i < 2; i++) {
-        float sign = i ? -1.0f : 1.0f;
-        Ent *ne;
-        if (old.collider.size > 0.4f) {
-          ne = add_ent(old);
-          ne->scale = sub3_f(ne->scale, 0.3f);
-          ne->collider.size -= 0.3f;
-        } else {
-          ne = add_ent((Ent) { .art = Art_Mineral });
-          ne->pick_up_after_tick = state->tick + 10;
-          give_ent_prop(ne, EntProp_PickUp);
-        }
-
-        ne->pos = add2_f(old.pos, old.collider.size/2.0f * sign);
-        ne->vel = mul2_f(old.vel, sign);
-
-        if (has_ent_prop(ne, EntProp_PassiveRotate))
-          ne->passive_rotate_axis = rand3();
-      }
+    //TODO: proper damage stat
+    ent->health-=1;
   }
 }
 

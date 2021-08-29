@@ -34,6 +34,15 @@ void _ai_idle(void *param0) {
   }
 }
 
+static void _ai_static_idle(void *param0) {
+  Ent *ent = (Ent *)param0;
+
+  if(ent->health<=0) {
+    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_death);
+    return;
+  }
+}
+
 static void _ai_move(void *param0) {
   Ent *ent = (Ent *)param0;
   Ent *target = try_gendex(ent->ai.target);
@@ -73,12 +82,6 @@ static void _ai_attack(void *param0) {
     return;
   }
 
-  //Rotate towards target
-  ent->angle = lerp_rad(ent->angle,rot_vec2(vec2_swap(sub2(target->pos,ent->pos))),0.04f);
-
-  //Actively decelerate towards standing still
-  ent->vel = mul2_f(ent->vel, 0.9f);
-
   //Shoot
   Vec2 e_dir = vec2_swap(vec2_rot(ent->angle));
   Ent *e = add_ent((Ent) {
@@ -91,12 +94,6 @@ static void _ai_attack(void *param0) {
     .collider.weight = 1.0f,
   });
   give_ent_prop(e, EntProp_Projectile);
-
-  //Revert to moving towards player if too far away
-  if(magmag2(sub2(ent->pos,target->pos))>m_square(25.f)) {
-    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_move);
-    return;
-  }
 }
 
 static void _ai_attack_idle(void *param0) {
@@ -120,6 +117,33 @@ static void _ai_attack_idle(void *param0) {
     _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_move);
     return;
   }
+}
+
+static void _ai_death_split(void *param0) {
+  Ent *ent = (Ent *)param0;
+
+  Ent old = *ent;
+  for (int i = 0; i < 2; i++) {
+    float sign = i ? -1.0f : 1.0f;
+    Ent *ne;
+    if (old.collider.size > 0.4f) {
+      ne = add_ent(old);
+      ne->scale = sub3_f(ne->scale, 0.3f);
+      ne->collider.size -= 0.3f;
+      ne->health = 1;
+      ne->passive_rotate_axis = rand3();
+      ai_init(ne,AI_TYPE_ASTEROID);
+    } else {
+      ne = add_ent((Ent) { .art = Art_Mineral });
+      ne->pick_up_after_tick = state->tick + 10;
+      give_ent_prop(ne, EntProp_PickUp);
+    }
+
+    ne->pos = add2_f(old.pos, old.collider.size/2.0f * sign);
+    ne->vel = mul2_f(old.vel, sign);
+  }
+
+  remove_ent(ent);
 }
 
 static void _ai_set_state(void *param0, AI_statenum nstate) {
@@ -157,6 +181,8 @@ static void ai_init(void *param0, AI_type type) {
 
 static void ai_run(void *param0) {
   Ent *ent = (Ent *)param0;
+  if(ent->ai.state==NULL)
+    return;
   ent->ai.tick++;
 
   if(state->tick>=ent->ai.tick_end)
