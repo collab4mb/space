@@ -81,7 +81,7 @@ static void collision(Ent *ac) {
           ne->scale = sub3_f(ne->scale, 0.3f);
           ne->collider.size -= 0.3f;
         } else {
-          ne = add_ent((Ent) { .art = Art_Mineral });
+          ne = add_ent((Ent) { .art = Art_Mineral, .bloom = 0.8f });
           ne->pick_up_after_tick = state->tick + 10;
           give_ent_prop(ne, EntProp_PickUp);
         }
