@@ -9,8 +9,8 @@ typedef struct {
   const char *src;
 } _obj_Parser;
 
-#define VERTEX_COUNT (1 << 14)
-#define INDEX_COUNT  (1 << 12)
+#define VERTEX_COUNT (1 << 15)
+#define INDEX_COUNT  (1 << 16)
 
 
 typedef struct {
