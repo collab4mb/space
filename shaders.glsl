@@ -48,19 +48,67 @@ void main() {
 
 @fs fs
 uniform sampler2D tex;
+uniform mesh_fs_params {
+  float bloom;
+};
 
 in vec3 light;
 in vec2 fs_uv;
 
-out vec4 frag_color;
+layout (location = 0) out vec4 frag_color;
+layout (location = 1) out vec4 bright_color;
 
 void main() {
   vec3 object_color = vec3(texture(tex, fs_uv));
   frag_color = vec4(object_color * light, 1);
+
+  float brightness = dot(frag_color.rgb, vec3(0.2126, 0.7152, 0.0722));
+  bright_color = vec4(step(1.0 - bloom, frag_color.rgb), 1);
 }
 @end
 
 @program mesh vs fs
+
+// ---------------------------------------------------- //
+
+@vs laser_vs
+uniform vs_params {
+    mat4 view_proj;
+    mat4 model;
+};
+
+in vec3 position;
+in vec2 uv;
+
+out vec2 fs_uv;
+
+void main() {
+  gl_Position = view_proj * model * vec4(position, 1.0);
+  fs_uv = uv;
+}
+@end
+
+@fs laser_fs
+uniform sampler2D tex;
+uniform mesh_fs_params {
+  float bloom;
+};
+
+in vec2 fs_uv;
+
+layout (location = 0) out vec4 frag_color;
+layout (location = 1) out vec4 bright_color;
+
+void main() {
+  vec3 object_color = vec3(texture(tex, fs_uv));
+  frag_color = vec4(object_color, 1);
+
+  float brightness = dot(frag_color.rgb, vec3(0.2126, 0.7152, 0.0722));
+  bright_color = vec4(step(1.0 - bloom, frag_color.rgb), 1);
+}
+@end
+
+@program laser laser_vs laser_fs
 
 // ---------------------------------------------------- //
 
@@ -84,7 +132,8 @@ void main() {
 @fs force_field_fs
 in vec2 fs_uv;
 
-out vec4 frag_color;
+layout (location = 0) out vec4 frag_color;
+layout (location = 1) out vec4 bright_color;
 
 uniform force_field_fs_params {
   vec2 stretch;
@@ -159,3 +208,65 @@ void main() {
 @end
 
 @program overlay overlay_vs overlay_fs
+
+@vs fsq_vs
+
+in vec2 pos;
+
+out vec2 uv;
+
+void main() {
+    gl_Position = vec4(pos*2.0-1.0, 0.5, 1.0);
+    uv = pos;
+}
+@end
+
+@fs fsq_fs
+uniform sampler2D tex;
+uniform sampler2D bloomed;
+
+in vec2 uv;
+
+out vec4 frag_color;
+
+void main() {
+  vec3 t = texture(tex, uv).rgb + texture(bloomed, uv).rgb;
+  frag_color = vec4(t, 1);
+}
+@end
+@program fsq fsq_vs fsq_fs
+
+@vs blur_vs
+@glsl_options flip_vert_y
+
+in vec2 pos;
+
+out vec2 uv;
+
+void main() {
+    gl_Position = vec4(pos*2.0-1.0, 0.5, 1.0);
+    uv = pos;
+}
+@end
+
+@fs blur_fs
+in vec2 uv;
+out vec4 frag_color;
+
+uniform sampler2D tex;
+uniform blur_fs_params {
+  vec2 hori;
+};
+const float weight[] = { 0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216 };
+
+void main() {
+  vec2 tex_offset = 1.0 / textureSize(tex, 0);
+  vec3 result = texture(tex, uv).rgb * weight[0]; // current fragment's contribution
+  for (int i = 1; i < 5; ++i) {
+    result += texture(tex, uv + hori * tex_offset * i).rgb * weight[i];
+    result += texture(tex, uv - hori * tex_offset * i).rgb * weight[i];
+  }
+  frag_color = vec4(result, 1.0);
+}
+@end
+@program blur blur_vs blur_fs
