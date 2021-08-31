@@ -68,7 +68,8 @@ static void collision(Ent *ac) {
       && has_ent_prop(ent, EntProp_Destructible)
       && has_ent_prop(ac,  EntProp_Projectile)) {
     ent->health-=ac->damage;
-    ai_damage(ent,&ac->parent);
+    if(has_ent_prop(ent,EntProp_HasAI))
+      ai_damage(ent,&ac->parent);
 
     remove_ent(ac);
   }
