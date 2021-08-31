@@ -115,7 +115,7 @@ typedef struct Ent{
   uint64_t pick_up_after_tick;
 
   Art art;
-  float bloom;
+  float bloom, transparency;
 
   Collider collider;
   AI ai;
@@ -369,6 +369,7 @@ void init(void) {
     });
     give_ent_prop(pillar, EntProp_PassiveRotate);
   }
+
   #define ASTEROIDS_PER_RING (7)
   #define ASTEROID_RINGS (3)
   #define ASTEROID_RING_SPACING (20.0f)
@@ -537,7 +538,10 @@ static void draw_ent_internal(Mat4 vp, Ent *ent) {
     };
     sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_force_field_fs_params, &SG_RANGE(fs_params));
   } else {
-    mesh_fs_params_t fs_params = { .bloom = 0.0f }; // ent->bloom };
+    mesh_fs_params_t fs_params = {
+      .bloom = ent->bloom,
+      .transparency = (ent->transparency==0.0f) ? 1.0f : ent->transparency,
+    };
     sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_mesh_fs_params, &SG_RANGE(fs_params));
   }
   vs_params_t vs_params = { .view_proj = vp, .model = m };
@@ -634,14 +638,17 @@ static void frame(void) {
     .colors[1] = { .action = SG_ACTION_CLEAR, .value = { 0.0f, 0.0f, 0.0f, 1.0f } }
   });
 
-  sg_apply_pipeline(state->pip[Shader_Standard]);
-  draw_ent(vp, &(Ent) {
-    .art = Art_Pillar,
-    .pos = add2(state->player->pos, mul2_f(vec2_swap(vec2_rot(state->player->angle)), 10.0)),
-    .height = 0.0,
-    .x_rot = 0,
-    .passive_rotate_axis = vec3_y,
-  });
+  if (state->build.appearing || state->build.appear_anim > 0) {
+    sg_apply_pipeline(state->pip[Shader_Standard]);
+    draw_ent(vp, &(Ent) {
+      .art = Art_Pillar,
+      .pos = add2(state->player->pos, mul2_f(vec2_swap(vec2_rot(state->player->angle)), 10.0)),
+      .height = 0,
+      .x_rot = 0,
+      .transparency = lerp(0, 0.5, fmax(fmin(state->build.appear_anim, 1.0), 0.0)),
+      .passive_rotate_axis = vec3_y,
+    });
+  }
 
   for (Shader shd = 0; shd < Shader_COUNT; shd++) {
     sg_apply_pipeline(state->pip[shd]);
