@@ -36,6 +36,10 @@
 #include "build/shaders.glsl.h"
 #include "overlay.h"
 
+//Forward declaration of types for use in function arguments
+typedef struct Ent Ent;
+typedef struct GenDex GenDex;
+
 //The list of enums/states will be getting bigger as we add more entities,
 //so move it to its own file
 #include "ai_type.h"
@@ -76,10 +80,10 @@ typedef struct {
   float size, weight;
 } Collider;
 
-typedef struct {
+struct GenDex{
   uint64_t generation;
   struct Ent *index;
-}GenDex;
+};
 
 typedef struct {
   int tick;
@@ -90,7 +94,7 @@ typedef struct {
 }AI;
 
 /* A game entity. Usually, it is rendered somewhere and has some sort of dynamic behavior */
-typedef struct Ent{
+struct Ent{
   /* packed into 64 bit sections for alignment */
   uint64_t props[(EntProp_COUNT + 63) / 64];
 
@@ -117,12 +121,15 @@ typedef struct Ent{
 
   int32_t damage;
 
+  /* Currently used for projectile source */
+  GenDex parent;
+
   Art art;
   float bloom;
 
   Collider collider;
   AI ai;
-} Ent;
+};
 static inline bool has_ent_prop(Ent *ent, EntProp prop) {
   return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
 }
@@ -143,6 +150,8 @@ static GenDex get_gendex(Ent *ent) {
 
 /* returns NULL if gendex is stale */
 static Ent* try_gendex(GenDex gd) {
+  if(gd.index==NULL)
+    return NULL;
   return (gd.index->generation == gd.generation) ? gd.index : NULL;
 }
 

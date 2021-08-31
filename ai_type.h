@@ -27,7 +27,7 @@ typedef enum {
   AI_TYPE_MAX,
 }AI_type;
 
-typedef void (*_ai_func_p1)(void *);
+typedef void (*_ai_func_p1)(Ent *);
 
 //'next' defines to what state the entity should switch after this state is over (TODO: implement time limit for states)
 //'action' gets called every frame for an entity and defines its behaviour, can change its state
@@ -48,17 +48,22 @@ typedef struct {
 //-------------------------------------
 
 //Function prototypes
-static void ai_init(void *param0, AI_type type);
-static void ai_run(void *param0);
-static void _ai_idle(void *param0);
-static void _ai_static_idle(void *param0);
-static void _ai_move(void *param0);
-static void _ai_attack_idle(void *param0);
-static void _ai_attack(void *param0);
-static void _ai_death_split(void *param0);
-static void _ai_death_loot(void *param0);
-static void _ai_set_state(void *param0, AI_statenum nstate);
-static void _ai_run_state(void *param0);
+static void ai_init(Ent *ent, AI_type type);
+//TODO: rename?
+static void ai_kill(Ent *ent);
+//TODO: rename?
+static void ai_damage(Ent *to, Ent *from, GenDex *source);
+
+//Internal
+static void ai_run(Ent *ent);
+static void _ai_idle(Ent *ent);
+static void _ai_move(Ent *ent);
+static void _ai_attack_idle(Ent *ent);
+static void _ai_attack(Ent *ent);
+static void _ai_death_split(Ent *ent);
+static void _ai_death_loot(Ent *ent);
+static void _ai_set_state(Ent *ent, AI_statenum nstate);
+static void _ai_run_state(Ent *ent);
 //-------------------------------------
 
 //Variables
@@ -70,8 +75,8 @@ static const AI_state _ai_state[AI_STATE_MAX] = {
   { .next = AI_STATE_SHIP_MOVE, .action = _ai_move, .ticks = 0},              //STATE_SHIP_MOVE
   { .next = AI_STATE_SHIP_ATTACK1, .action = _ai_attack_idle, .ticks = 30},   //STATE_SHIP_ATTACK0
   { .next = AI_STATE_SHIP_ATTACK0, .action = _ai_attack, .ticks = 0},         //STATE_SHIP_ATTACK1
-  { .next = AI_STATE_SHIP_DEATH, .action = _ai_death_loot, .ticks = 0},         //STATE_SHIP_DEATH
-  { .next = AI_STATE_ASTEROID_IDLE, .action = _ai_static_idle, .ticks = 0},   //STATE_ASTEROID_IDLE
+  { .next = AI_STATE_SHIP_DEATH, .action = _ai_death_loot, .ticks = 0},       //STATE_SHIP_DEATH
+  { .next = AI_STATE_ASTEROID_IDLE, .action = NULL, .ticks = 0},              //STATE_ASTEROID_IDLE
   { .next = AI_STATE_ASTEROID_DEATH, .action = _ai_death_split, .ticks = 0},  //STATE_ASTEROID_DEATH
 };
 

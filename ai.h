@@ -23,15 +23,7 @@
 
 //Function implementations
 
-void _ai_idle(void *param0) {
-  Ent *ent = (Ent *)param0;
-
-  //Die
-  if(ent->health<=0) {
-    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_death);
-    return;
-  }
-
+void _ai_idle(Ent *ent) {
   if(magmag2(sub2(ent->pos,state->player->pos))<m_square(50.0f)&&
      dot2(vec2_swap(vec2_rot(ent->angle)),norm2(sub2(state->player->pos,ent->pos))) > 0.5) {
     ent->ai.target = get_gendex(state->player);
@@ -40,24 +32,8 @@ void _ai_idle(void *param0) {
   }
 }
 
-static void _ai_static_idle(void *param0) {
-  Ent *ent = (Ent *)param0;
-
-  if(ent->health<=0) {
-    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_death);
-    return;
-  }
-}
-
-static void _ai_move(void *param0) {
-  Ent *ent = (Ent *)param0;
+static void _ai_move(Ent *ent) {
   Ent *target = try_gendex(ent->ai.target);
-
-  //Die
-  if(ent->health<=0) {
-    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_death);
-    return;
-  }
 
   //If target has been destroyed, revert to being idle
   if(target==NULL) {
@@ -84,15 +60,8 @@ static void _ai_move(void *param0) {
   }
 }
 
-static void _ai_attack(void *param0) {
-  Ent *ent = (Ent *)param0;
+static void _ai_attack(Ent *ent) {
   Ent *target = try_gendex(ent->ai.target);
-
-  //Die
-  if(ent->health<=0) {
-    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_death);
-    return;
-  }
 
   //If target has been destroyed, revert to being idle
   if(target==NULL) {
@@ -111,19 +80,13 @@ static void _ai_attack(void *param0) {
     .collider.size = 0.2f,
     .collider.weight = 1.0f,
     .damage = ent->damage,
+    .parent = get_gendex(ent),
   });
   give_ent_prop(e, EntProp_Projectile);
 }
 
-static void _ai_attack_idle(void *param0) {
-  Ent *ent = (Ent *)param0;
+static void _ai_attack_idle(Ent *ent) {
   Ent *target = try_gendex(ent->ai.target);
-
-  //Die
-  if(ent->health<=0) {
-    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_death);
-    return;
-  }
 
   //If target has been destroyed, revert to being idle
   if(target==NULL) {
@@ -144,9 +107,7 @@ static void _ai_attack_idle(void *param0) {
   }
 }
 
-static void _ai_death_split(void *param0) {
-  Ent *ent = (Ent *)param0;
-
+static void _ai_death_split(Ent *ent) {
   Ent old = *ent;
   for (int i = 0; i < 2; i++) {
     float sign = i ? -1.0f : 1.0f;
@@ -171,9 +132,7 @@ static void _ai_death_split(void *param0) {
   remove_ent(ent);
 }
 
-static void _ai_death_loot(void *param0) {
-  Ent *ent = (Ent *)param0;
-
+static void _ai_death_loot(Ent *ent) {
   Ent old = *ent;
   for (int i = 0; i < 2; i++) {
     float sign = i ? -1.0f : 1.0f;
@@ -189,9 +148,7 @@ static void _ai_death_loot(void *param0) {
   remove_ent(ent);
 }
 
-static void _ai_set_state(void *param0, AI_statenum nstate) {
-  Ent *ent = (Ent *)param0;
-
+static void _ai_set_state(Ent *ent, AI_statenum nstate) {
   ent->ai.state = &_ai_state[nstate];
   ent->ai.tick_end = state->tick+ent->ai.state->ticks;
 
@@ -199,23 +156,18 @@ static void _ai_set_state(void *param0, AI_statenum nstate) {
     ent->ai.state->action(ent);
 }
 
-static void _ai_run_state(void *param0) {
-  Ent *ent = (Ent *)param0;
-
+static void _ai_run_state(Ent *ent) {
   if(ent->ai.state->action!=NULL)
       ent->ai.state->action(ent);
 }
 
-static void ai_init(void *param0, AI_type type) {
-  Ent *ent = (Ent *)param0;
-
+static void ai_init(Ent *ent, AI_type type) {
   ent->ai.type = type;
   ent->ai.state = &_ai_state[_ai_entinfo[ent->ai.type].state_idle];
   ent->ai.tick_end = state->tick+ent->ai.state->ticks;
 }
 
-static void ai_run(void *param0) {
-  Ent *ent = (Ent *)param0;
+static void ai_run(Ent *ent) {
   if(ent->ai.state==NULL)
     return;
 
@@ -223,6 +175,28 @@ static void ai_run(void *param0) {
     _ai_set_state(ent,ent->ai.state->next);
   else
     _ai_run_state(ent);
+}
+
+static void ai_kill(Ent *ent) {
+  //TODO: call function for dropping loot here
+
+  _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_death);
+}
+
+static void ai_damage(Ent *to, Ent *from, GenDex *source) {
+  if(!has_ent_prop(to,EntProp_Destructible))
+    return;
+
+  //Go after attacker
+  Ent *target = try_gendex(to->ai.target);
+  if(target==NULL&&try_gendex(*source)!=NULL) {
+    to->ai.target = *source;
+    _ai_set_state(to,_ai_entinfo[to->ai.type].state_move);
+  }
+
+  to->health-=from->damage;
+  if(to->health<=0)
+    ai_kill(to);
 }
 //-------------------------------------
 

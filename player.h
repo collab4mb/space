@@ -24,6 +24,7 @@ static void player_update(Ent *player) {
       .collider.size = 0.2f,
       .collider.weight = 1.0f,
       .damage = player->damage,
+      .parent = get_gendex(player),
     });
     give_ent_prop(e, EntProp_Projectile);
   }
