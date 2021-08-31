@@ -63,8 +63,10 @@ void ol_init() {
     .cull_mode = SG_CULLMODE_NONE,
     .depth = {
       .write_enabled = true,
+      .pixel_format = SG_PIXELFORMAT_DEPTH_STENCIL,
       .compare = SG_COMPAREFUNC_LESS_EQUAL,
     },
+    .color_count = 2,
     .colors[0].blend = (sg_blend_state){
       .enabled = true,
       .src_factor_rgb = SG_BLENDFACTOR_SRC_ALPHA,

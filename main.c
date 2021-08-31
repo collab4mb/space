@@ -68,7 +68,7 @@ typedef enum {
   EntProp_COUNT,
 } EntProp;
 
-typedef enum { Art_Ship, Art_Asteroid, Art_Plane, Art_Mineral, Art_COUNT } Art;
+typedef enum { Art_Ship, Art_Asteroid, Art_Plane, Art_Laser, Art_Mineral, Art_COUNT } Art;
 
 typedef enum { Shape_Circle, Shape_Line } Shape;
 typedef struct {
@@ -118,6 +118,7 @@ typedef struct Ent{
   int32_t damage;
 
   Art art;
+  float bloom;
 
   Collider collider;
   AI ai;
@@ -142,12 +143,10 @@ static GenDex get_gendex(Ent *ent) {
 
 /* returns NULL if gendex is stale */
 static Ent* try_gendex(GenDex gd) {
-  //Original code by cedric (not valid C):
-  //return gd.index * (gd.index->generation == gd.generation);
-  return ((gd.index->generation==gd.generation)&&gd.index!=NULL)?gd.index:NULL;
+  return (gd.index->generation == gd.generation) ? gd.index : NULL;
 }
 
-typedef enum { Shader_Standard, Shader_ForceField, Shader_COUNT } Shader;
+typedef enum { Shader_Standard, Shader_Laser, Shader_ForceField, Shader_COUNT } Shader;
 
 typedef struct {
   sg_buffer ibuf, vbuf;
@@ -157,9 +156,9 @@ typedef struct {
   size_t index_count;
 } Mesh;
 
+#define OFFSCREEN_SAMPLE_COUNT (4)
 #define STATE_MAX_ENTS (1 << 12)
 typedef struct {
-  sg_pass_action pass_action;
   sg_pipeline pip[Shader_COUNT];
   Mesh meshes[Art_COUNT];
   Ent ents[STATE_MAX_ENTS];
@@ -167,6 +166,19 @@ typedef struct {
   float player_turn_accel;
   uint64_t frame, tick;
   double fixed_tick_accumulator;
+  struct {
+    sg_image color_img, bright_img, depth_img;
+    sg_pass pass;
+  } offscreen;
+  struct {
+    sg_buffer quad_vbuf;
+    sg_pipeline pip;
+  } fsq;
+  struct {
+    sg_image imgs[2];
+    sg_pass passes[2];
+    sg_pipeline pip;
+  } blur;
 } State;
 static State *state;
 
@@ -281,6 +293,49 @@ void load_mesh(Art art, Shader shader, const char *path, const char *texture) {
   free((void*)input);
 }
 
+void resize_framebuffers(void) {
+  /* destroy previous resource (can be called for invalid id) */
+  sg_destroy_pass(state->offscreen.pass);
+  sg_destroy_image(state->offscreen.color_img);
+  sg_destroy_image(state->offscreen.depth_img);
+  sg_destroy_image(state->offscreen.bright_img);
+  for (int i = 0; i < 2; i++) {
+    sg_destroy_image(state->blur.imgs[i]);
+    sg_destroy_pass(state->blur.passes[i]);
+  }
+
+  /* a render pass with one color- and one depth-attachment image */
+  sg_image_desc img_desc = {
+    .render_target = true,
+    .width = sapp_widthf(),
+    .height = sapp_heightf(),
+    .pixel_format = SG_PIXELFORMAT_RGBA8,
+    .min_filter = SG_FILTER_LINEAR,
+    .mag_filter = SG_FILTER_LINEAR,
+    .wrap_u = SG_WRAP_CLAMP_TO_EDGE,
+    .wrap_v = SG_WRAP_CLAMP_TO_EDGE,
+    .sample_count = OFFSCREEN_SAMPLE_COUNT,
+  };
+  state->offscreen.color_img = sg_make_image(&img_desc);
+  state->offscreen.bright_img = sg_make_image(&img_desc);
+
+  for (int i = 0; i < 2; i++) {
+    state->blur.imgs[i] = sg_make_image(&img_desc);
+    state->blur.passes[i] = sg_make_pass(&(sg_pass_desc) {
+      .color_attachments[0].image = state->blur.imgs[i]
+    });
+  }
+
+  img_desc.pixel_format = SG_PIXELFORMAT_DEPTH_STENCIL;
+  state->offscreen.depth_img = sg_make_image(&img_desc);
+  state->offscreen.pass = sg_make_pass(&(sg_pass_desc){
+    .color_attachments[0].image = state->offscreen.color_img,
+    .color_attachments[1].image = state->offscreen.bright_img,
+    .depth_stencil_attachment.image = state->offscreen.depth_img,
+    .label = "offscreen-pass"
+  });
+}
+
 void init(void) {
   seed_rand(9, 12, 32, 10);
 
@@ -368,6 +423,7 @@ void init(void) {
   load_mesh(    Art_Ship,   Shader_Standard,     "./Bob.obj", "./Bob_Orange.png");
   load_mesh(Art_Asteroid,   Shader_Standard,"./Asteroid.obj",       "./Moon.png");
   load_mesh(   Art_Plane, Shader_ForceField,   "./Plane.obj",               NULL);
+  load_mesh(   Art_Laser,      Shader_Laser,   "./LASER.obj",    "./Mineral.png");
   load_mesh( Art_Mineral,   Shader_Standard, "./Mineral.obj",    "./Mineral.png");
 
   test_font = ol_load_font("./Orbitron-Regular.ttf");
@@ -388,8 +444,10 @@ void init(void) {
     .cull_mode = SG_CULLMODE_BACK,
     .depth = {
       .write_enabled = true,
+      .pixel_format = SG_PIXELFORMAT_DEPTH_STENCIL,
       .compare = SG_COMPAREFUNC_LESS_EQUAL,
     },
+    .color_count = 2,
     .colors[0].blend = (sg_blend_state) {
       .enabled = true,
       .src_factor_rgb = SG_BLENDFACTOR_ONE, 
@@ -402,10 +460,41 @@ void init(void) {
   desc.shader = sg_make_shader(mesh_shader_desc(sg_query_backend()));
   state->pip[Shader_Standard] = sg_make_pipeline(&desc);
 
+  desc.shader = sg_make_shader(laser_shader_desc(sg_query_backend()));
+  state->pip[Shader_Laser] = sg_make_pipeline(&desc);
+
   desc.shader = sg_make_shader(force_field_shader_desc(sg_query_backend()));
   state->pip[Shader_ForceField] = sg_make_pipeline(&desc);
 
   test_image = ol_load_image("./test_tex.png");
+
+  /* a vertex buffer to render a fullscreen rectangle */
+  state->fsq.quad_vbuf = sg_make_buffer(&(sg_buffer_desc){
+    .data = SG_RANGE(((float[]) { 0.0f, 0.0f,  1.0f, 0.0f,  0.0f, 1.0f,  1.0f, 1.0f })),
+    .label = "quad vertices"
+  });
+
+  /* create pipeline object */
+  state->fsq.pip = sg_make_pipeline(&(sg_pipeline_desc){
+    .layout = {
+      .attrs[ATTR_fsq_vs_pos].format = SG_VERTEXFORMAT_FLOAT2
+    },
+    .shader = sg_make_shader(fsq_shader_desc(sg_query_backend())),
+    .primitive_type = SG_PRIMITIVETYPE_TRIANGLE_STRIP,
+    .label = "fullscreen quad pipeline"
+  });
+
+  state->blur.pip = sg_make_pipeline(&(sg_pipeline_desc){
+    .layout = {
+      .attrs[ATTR_fsq_vs_pos].format = SG_VERTEXFORMAT_FLOAT2
+    },
+    .shader = sg_make_shader(blur_shader_desc(sg_query_backend())),
+    .primitive_type = SG_PRIMITIVETYPE_TRIANGLE_STRIP,
+    .depth.pixel_format = SG_PIXELFORMAT_NONE,
+    .label = "blur pipeline"
+  });
+
+  resize_framebuffers();
 }
 
 /* naively renders with n draw calls per entity
@@ -442,9 +531,13 @@ static void draw_ent(Mat4 vp, Ent *ent) {
       .time = ent->time_since_last_collision,
     };
     sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_force_field_fs_params, &SG_RANGE(fs_params));
+  } else {
+    mesh_fs_params_t fs_params = { .bloom = 0.0f }; // ent->bloom };
+    sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_mesh_fs_params, &SG_RANGE(fs_params));
   }
   vs_params_t vs_params = { .view_proj = vp, .model = m };
   sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_vs_params, &SG_RANGE(vs_params));
+
 
   sg_draw(0, mesh->index_count, 1);
 }
@@ -508,10 +601,13 @@ static void frame(void) {
 
   Mat4 vp = mul4x4(proj, view);
 
-  sg_pass_action pass_action = {
-    .colors[0] = { .action = SG_ACTION_CLEAR, .value = { 0.25f/20.0, 0.25f/20.0, 0.75f/20.0, 1.0f } }
-  };
-  sg_begin_default_pass(&pass_action, (int)w, (int)h);
+  sg_begin_pass(state->offscreen.pass, &(sg_pass_action) {
+    .colors[0] = {
+      .action = SG_ACTION_CLEAR,
+      .value = { 0.25f/20.0, 0.25f/20.0, 0.75f/20.0, 1.0f }
+    },
+    .colors[1] = { .action = SG_ACTION_CLEAR, .value = { 0.0f, 0.0f, 0.0f, 1.0f } }
+  });
 
   for (Shader shd = 0; shd < Shader_COUNT; shd++) {
     sg_apply_pipeline(state->pip[shd]);
@@ -539,6 +635,41 @@ static void frame(void) {
   ol_draw_text(&test_font, text, 60, 70, vec4(0.4, 0.8, 1.0, 1.0));
 
   sg_end_pass();
+
+  int horizontal = 1;
+  for (int i = 0; i < 16; i++) {
+    sg_begin_pass(state->blur.passes[horizontal], &(sg_pass_action) {
+      .colors[0] = { .action = SG_ACTION_LOAD }
+    });
+    sg_apply_pipeline(state->blur.pip);
+    sg_apply_bindings(&(sg_bindings) {
+      .vertex_buffers[0] = state->fsq.quad_vbuf,
+      .fs_images = {
+        [SLOT_tex] = i ? state->blur.imgs[!horizontal] : state->offscreen.bright_img
+      }
+    });
+    blur_fs_params_t fs_params = { .hori = vec2(horizontal, !horizontal) };
+    sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_blur_fs_params, &SG_RANGE(fs_params));
+    sg_draw(0, 4, 1);
+    sg_end_pass();
+    horizontal = !horizontal;
+  }
+
+  sg_pass_action pass_action = {
+    .colors[0] = { .action = SG_ACTION_CLEAR, .value = { 0.0f, 0.0f, 0.0f, 1.0f } }
+  };
+  sg_begin_default_pass(&pass_action, (int)w, (int)h);
+  sg_apply_pipeline(state->fsq.pip);
+  sg_apply_bindings(&(sg_bindings) {
+    .vertex_buffers[0] = state->fsq.quad_vbuf,
+    .fs_images = {
+      [SLOT_tex] = state->offscreen.color_img,
+      [SLOT_bloomed] = state->blur.imgs[!horizontal]
+    }
+  });
+  sg_draw(0, 4, 1);
+  sg_end_pass();
+
   sg_commit();
 
   input_update();
@@ -566,6 +697,9 @@ static void event(const sapp_event *ev) {
     case SAPP_EVENTTYPE_MOUSE_UP: {
         input_mouse_update(ev->mouse_button,0);
     } break;
+    case SAPP_EVENTTYPE_RESIZED: {
+      resize_framebuffers();
+    } break;
     default:;
   }
 }
@@ -579,7 +713,7 @@ sapp_desc sokol_main(int argc, char* argv[]) {
     .event_cb = event,
     .width = 800,
     .height = 600,
-    .sample_count = 4,
+    .sample_count = OFFSCREEN_SAMPLE_COUNT,
     .gl_force_gles2 = true,
     .window_title = "Space Game (collab4mb)",
     .icon.sokol_default = true,
