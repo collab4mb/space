@@ -70,7 +70,7 @@ typedef enum {
   EntProp_COUNT,
 } EntProp;
 
-typedef enum { Art_Ship, Art_Asteroid, Art_Plane, Art_Laser, Art_Mineral, Art_COUNT } Art;
+typedef enum { Art_Ship, Art_Asteroid, Art_Plane, Art_Pillar, Art_Laser, Art_Mineral, Art_COUNT } Art;
 
 typedef enum { Shape_Circle, Shape_Line } Shape;
 typedef struct {
@@ -103,6 +103,7 @@ typedef struct Ent{
   Vec3 scale;
 
   float angle;
+  float x_rot;
 
   /* used for animations */
   float time_since_last_collision;
@@ -233,7 +234,7 @@ void load_texture(Art art, const char *texture) {
   cp_flip_image_horizontal(&player_png);
   int w = player_png.w;
   int h = player_png.h;
-  if (art == Art_Ship)
+  if (art == Art_Ship || art == Art_Pillar)
     state->meshes[art].texture = sg_make_image_with_mipmaps(&(sg_image_desc){
       .width = w,
       .height = h,
@@ -352,12 +353,24 @@ void init(void) {
   add_ent((Ent) {
     .art = Art_Plane,
     .pos = { -1.5, 6.5 },
-    .scale = { 5.0f, 3.0f, 1.0f },
+    .scale = { 5.0f, 4.0f, 1.0f },
     .height = -1.0f,
     .collider.size = 9.0f,
     .collider.shape = Shape_Line,
     .collider.weight = 1000.0f,
   });
+
+  for (int i = -1; i < 2; i += 2)
+    for (int h = -1; h < 2; h += 2) {
+      Ent *pillar = add_ent((Ent) {
+        .art = Art_Pillar,
+        .pos = { -1.5 + i * 4.2, 6.5 },
+        .height = -1.0f + h * 1.7f,
+        .x_rot = m_min(h * PI_f, 0),
+        .passive_rotate_axis = vec3_y,
+      });
+      give_ent_prop(pillar, EntProp_PassiveRotate);
+    }
 
   #define ASTEROIDS_PER_RING (7)
   #define ASTEROID_RINGS (3)
@@ -414,6 +427,7 @@ void init(void) {
   load_mesh(   Art_Plane, Shader_ForceField,   "./Plane.obj",               NULL);
   load_mesh(   Art_Laser,      Shader_Laser,   "./LASER.obj",    "./Mineral.png");
   load_mesh( Art_Mineral,   Shader_Standard, "./Mineral.obj",    "./Mineral.png");
+  load_mesh(  Art_Pillar,   Shader_Standard,  "./Pillar.obj",     "./Pillar.png");
 
   ui_atlas = ol_load_image("./ui.png");
   test_font = ol_load_font("./Orbitron-Regular.ttf");
@@ -495,6 +509,8 @@ static void draw_ent(Mat4 vp, Ent *ent) {
   Mat4 m = translate4x4(vec3(ent->pos.x, ent->height, ent->pos.y));
 
   m = mul4x4(m, y_rotate4x4(ent->angle));
+  if (ent->x_rot != 0.0f)
+    m = mul4x4(m, x_rotate4x4(ent->x_rot));
   if (ent == state->player)
     m = mul4x4(m, z_rotate4x4(state->player_turn_accel*-2.0f));
   if (has_ent_prop(ent, EntProp_PassiveRotate))
