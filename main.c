@@ -114,7 +114,7 @@ typedef struct Ent{
   uint64_t pick_up_after_tick;
 
   Art art;
-  float bloom;
+  float bloom, transparency;
 
   Collider collider;
   AI ai;
@@ -362,6 +362,7 @@ void init(void) {
         .height = -1.0f + h * 1.7f,
         .x_rot = m_min(h * PI_f, 0),
         .passive_rotate_axis = vec3_y,
+        .transparency = (i+h == 2) ? 0.25f : 1.0f,
       });
       give_ent_prop(pillar, EntProp_PassiveRotate);
     }
@@ -531,7 +532,10 @@ static void draw_ent(Mat4 vp, Ent *ent) {
     };
     sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_force_field_fs_params, &SG_RANGE(fs_params));
   } else {
-    mesh_fs_params_t fs_params = { .bloom = 0.0f }; // ent->bloom };
+    mesh_fs_params_t fs_params = {
+      .bloom = ent->bloom,
+      .transparency = (ent->transparency==0.0f) ? 1.0f : ent->transparency,
+    };
     sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_mesh_fs_params, &SG_RANGE(fs_params));
   }
   vs_params_t vs_params = { .view_proj = vp, .model = m };

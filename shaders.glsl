@@ -50,6 +50,7 @@ void main() {
 uniform sampler2D tex;
 uniform mesh_fs_params {
   float bloom;
+  float transparency;
 };
 
 in vec3 light;
@@ -60,7 +61,7 @@ layout (location = 1) out vec4 bright_color;
 
 void main() {
   vec3 object_color = vec3(texture(tex, fs_uv));
-  frag_color = vec4(object_color * light, 1);
+  frag_color = vec4(object_color * light, 1) * transparency;
 
   float brightness = dot(frag_color.rgb, vec3(0.2126, 0.7152, 0.0722));
   bright_color = vec4(step(1.0 - bloom, frag_color.rgb), 1);
@@ -92,6 +93,7 @@ void main() {
 uniform sampler2D tex;
 uniform mesh_fs_params {
   float bloom;
+  float transparency;
 };
 
 in vec2 fs_uv;
