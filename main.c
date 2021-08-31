@@ -88,7 +88,6 @@ struct GenDex{
 typedef struct {
   int tick;
   const AI_state *state;
-  AI_type type;
   GenDex target;
   uint64_t tick_end;
 }AI;
@@ -396,8 +395,6 @@ void init(void) {
       });
       give_ent_prop(ast, EntProp_PassiveRotate);
       give_ent_prop(ast, EntProp_Destructible);
-      give_ent_prop(ast, EntProp_HasAI);
-      ai_init(ast,AI_TYPE_ASTEROID);
     }
 
   stm_setup();
@@ -415,7 +412,7 @@ void init(void) {
   });
   give_ent_prop(en,EntProp_HasAI);
   give_ent_prop(en,EntProp_Destructible);
-  ai_init(en,AI_TYPE_DSHIP);
+  ai_init(en,AI_STATE_IDLE);
   en = add_ent((Ent) {
     .art = Art_Ship,
     .pos = { -10, 12.5 },
@@ -426,7 +423,7 @@ void init(void) {
   });
   give_ent_prop(en,EntProp_HasAI);
   give_ent_prop(en,EntProp_Destructible);
-  ai_init(en,AI_TYPE_DSHIP);
+  ai_init(en,AI_STATE_IDLE);
 
 
   load_mesh(    Art_Ship,   Shader_Standard,     "./Bob.obj", "./Bob_Orange.png");
@@ -555,9 +552,16 @@ static void tick(void) {
   state->tick++;
 
   player_update(state->player);
-  for (Ent *ent = 0; (ent = ent_all_iter(ent));)
+  for (Ent *ent = 0; (ent = ent_all_iter(ent));) {
     if(has_ent_prop(ent,EntProp_HasAI))
       ai_run(ent);
+
+    if(has_ent_prop(ent, EntProp_Destructible)&&ent->health <= 0) {
+      remove_ent(ent);
+      //TODO: handle loot and asteroid splitting
+    }
+  }
+
   for (Ent *ent = 0; (ent = ent_all_iter(ent));)
     collision(ent);
   for (Ent *ent = 0; (ent = ent_all_iter(ent));) {

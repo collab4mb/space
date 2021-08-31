@@ -27,7 +27,7 @@ void _ai_idle(Ent *ent) {
   if(magmag2(sub2(ent->pos,state->player->pos))<m_square(50.0f)&&
      dot2(vec2_swap(vec2_rot(ent->angle)),norm2(sub2(state->player->pos,ent->pos))) > 0.5) {
     ent->ai.target = get_gendex(state->player);
-    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_move);
+    _ai_set_state(ent,AI_STATE_MOVE);
     return;
   }
 }
@@ -37,7 +37,7 @@ static void _ai_move(Ent *ent) {
 
   //If target has been destroyed, revert to being idle
   if(target==NULL) {
-    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_idle);
+    _ai_set_state(ent,AI_STATE_IDLE);
     return;
   }
 
@@ -49,13 +49,13 @@ static void _ai_move(Ent *ent) {
   if (magmag2(ent->vel)>MAX_SPEED2)
     ent->vel = mul2_f(norm2(ent->vel),MAX_SPEED);
   if(magmag2(sub2(ent->pos,target->pos))<=m_square(10.f)) {
-    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_attack);
+    _ai_set_state(ent,AI_STATE_ATTACK0);
     return;
   }
 
   //Loose interest if target too far away
   if(magmag2(sub2(ent->pos,target->pos))>=m_square(80.f)) {
-    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_idle);
+    _ai_set_state(ent,AI_STATE_IDLE);
     return;
   }
 }
@@ -65,7 +65,7 @@ static void _ai_attack(Ent *ent) {
 
   //If target has been destroyed, revert to being idle
   if(target==NULL) {
-    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_idle);
+    _ai_set_state(ent,AI_STATE_IDLE);
     return;
   }
 
@@ -90,7 +90,7 @@ static void _ai_attack_idle(Ent *ent) {
 
   //If target has been destroyed, revert to being idle
   if(target==NULL) {
-    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_idle);
+    _ai_set_state(ent,AI_STATE_IDLE);
     return;
   }
 
@@ -102,50 +102,9 @@ static void _ai_attack_idle(Ent *ent) {
 
   //Revert to moving towards player if too far away
   if(magmag2(sub2(ent->pos,target->pos))>m_square(25.f)) {
-    _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_move);
+    _ai_set_state(ent,AI_STATE_MOVE);
     return;
   }
-}
-
-static void _ai_death_split(Ent *ent) {
-  Ent old = *ent;
-  for (int i = 0; i < 2; i++) {
-    float sign = i ? -1.0f : 1.0f;
-    Ent *ne;
-    if (old.collider.size > 0.4f) {
-      ne = add_ent(old);
-      ne->scale = sub3_f(ne->scale, 0.3f);
-      ne->collider.size -= 0.3f;
-      ne->health = 1;
-      ne->passive_rotate_axis = rand3();
-      ai_init(ne,AI_TYPE_ASTEROID);
-    } else {
-      ne = add_ent((Ent) { .art = Art_Mineral });
-      ne->pick_up_after_tick = state->tick + 10;
-      give_ent_prop(ne, EntProp_PickUp);
-    }
-
-    ne->pos = add2_f(old.pos, old.collider.size/2.0f * sign);
-    ne->vel = mul2_f(old.vel, sign);
-  }
-
-  remove_ent(ent);
-}
-
-static void _ai_death_loot(Ent *ent) {
-  Ent old = *ent;
-  for (int i = 0; i < 2; i++) {
-    float sign = i ? -1.0f : 1.0f;
-    Ent *ne;
-    ne = add_ent((Ent) { .art = Art_Mineral });
-    ne->pick_up_after_tick = state->tick + 10;
-    give_ent_prop(ne, EntProp_PickUp);
-
-    ne->pos = add2_f(old.pos, old.collider.size/2.0f * sign);
-    ne->vel = mul2_f(old.vel, sign);
-  }
-
-  remove_ent(ent);
 }
 
 static void _ai_set_state(Ent *ent, AI_statenum nstate) {
@@ -161,9 +120,8 @@ static void _ai_run_state(Ent *ent) {
       ent->ai.state->action(ent);
 }
 
-static void ai_init(Ent *ent, AI_type type) {
-  ent->ai.type = type;
-  ent->ai.state = &_ai_state[_ai_entinfo[ent->ai.type].state_idle];
+static void ai_init(Ent *ent, AI_statenum sstate) {
+  ent->ai.state = &_ai_state[sstate];
   ent->ai.tick_end = state->tick+ent->ai.state->ticks;
 }
 
@@ -177,13 +135,7 @@ static void ai_run(Ent *ent) {
     _ai_run_state(ent);
 }
 
-static void ai_kill(Ent *ent) {
-  //TODO: call function for dropping loot here
-
-  _ai_set_state(ent,_ai_entinfo[ent->ai.type].state_death);
-}
-
-static void ai_damage(Ent *to, Ent *from, GenDex *source) {
+static void ai_damage(Ent *to, GenDex *source) {
   if(!has_ent_prop(to,EntProp_Destructible))
     return;
 
@@ -191,12 +143,8 @@ static void ai_damage(Ent *to, Ent *from, GenDex *source) {
   Ent *target = try_gendex(to->ai.target);
   if(target==NULL&&try_gendex(*source)!=NULL) {
     to->ai.target = *source;
-    _ai_set_state(to,_ai_entinfo[to->ai.type].state_move);
+    _ai_set_state(to,AI_STATE_MOVE);
   }
-
-  to->health-=from->damage;
-  if(to->health<=0)
-    ai_kill(to);
 }
 //-------------------------------------
 
