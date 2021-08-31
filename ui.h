@@ -1,10 +1,12 @@
 #include <stdarg.h>
+
 typedef struct {
     enum { 
         Ui_Cmd_Frame,
         Ui_Cmd_Image,
         Ui_Cmd_Text,
     } kind;
+    int tag;
     ol_Rect rect;
     union {
       struct {
@@ -49,8 +51,6 @@ typedef struct {
 } ui_Layout;
 
 #define TEXBUF_SIZE (1 << 16)
-// Warning, this double-evaluates
-#define UI_DEFER(fn, efn, b, wcalc, hcalc) ui_measuremode(); fn(0, 0); b; ui_end_measuremode(); { ol_Rect size = efn(); fn(wcalc, hcalc); b; efn(); }
 
 typedef struct {
   ol_Font *font;
@@ -61,6 +61,8 @@ typedef struct {
   ui_Layout layouts[32];
   size_t layout_count;
   size_t measuremode_counter;
+  size_t command_iter;
+  int offset_x, offset_y;
 } ui_State;
 
 static ui_State _ui_state;
@@ -156,6 +158,19 @@ static ol_Rect _ui_query_bounds(int width, int height) {
   return rect;
 }
 
+static void ui_setoffset(int x, int y) {
+  _ui_state.offset_x = x;
+  _ui_state.offset_y = y;
+}
+
+static void ui_gap(int gap) {
+  ui_Layout *layout = _ui_getlayout(0);
+  if (layout->kind == Ui_Layout_Row)
+    layout->data.row.offset += gap;
+  if (layout->kind == Ui_Layout_Column)
+    layout->data.column.offset += gap;
+}
+
 static void ui_screen(int width, int height) {
   ui_Layout layout = { 
     .kind = Ui_Layout_Screen,
@@ -243,6 +258,8 @@ static int ui_rel_y(float mul) {
 }
 
 static void ui_addcommand(ui_Command cmd) {
+  cmd.rect.x += _ui_state.offset_x;
+  cmd.rect.y += _ui_state.offset_y;
   if (_ui_state.measuremode_counter == 0) {
     _ui_state.commands[_ui_state.command_count] = cmd;
     _ui_state.command_count += 1;
@@ -312,6 +329,14 @@ static void ui_image_part(ol_Image *img, ol_Rect part) {
   });
 }
 
+static void ui_frame(int width, int height, int tag) {
+  ui_addcommand((ui_Command) {
+    .kind = Ui_Cmd_Frame,
+    .rect = _ui_query_bounds(width, height),
+    .tag = tag,
+  });
+}
+
 static void ui_vtextf(const char *fmt, va_list vl) {
   // TODO: Add checks
   assert(_ui_state.textbuf_offs < TEXBUF_SIZE && "Text buffer overflow, please print less text, or you forgot to call ui_end_pass after commands");
@@ -330,13 +355,16 @@ static void ui_textf(const char *fmt, ...) {
 
 
 static void ui_end_pass() {
+  _ui_state.offset_x = 0;
+  _ui_state.offset_y = 0;
+  _ui_state.command_count = 0;
+  _ui_state.command_iter = 0;
   _ui_state.textbuf_offs = 0;
 }
 
 static ui_Command *ui_command_next() {
-  if (_ui_state.command_count == 0) return NULL;
-  _ui_state.command_count -= 1;
-  return &_ui_state.commands[_ui_state.command_count];
+  if (_ui_state.command_count == _ui_state.command_iter) return NULL;
+  return &_ui_state.commands[_ui_state.command_iter++];
 }
 
 static void ui_deinit() {

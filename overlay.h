@@ -1,5 +1,3 @@
-#include "math.h"
-#include <stdint.h>
 typedef struct {
   sg_buffer ibuf, vbuf;
   size_t index_count;
@@ -17,6 +15,11 @@ typedef struct {
   int w;
   int h;
 } ol_Rect;
+
+typedef struct {
+  ol_Rect outer;
+  ol_Rect inner;
+} ol_NinePatch;
 
 typedef struct {
   sg_image sg;
@@ -71,7 +74,6 @@ void ol_init() {
       .enabled = true,
       .src_factor_rgb = SG_BLENDFACTOR_SRC_ALPHA,
       .dst_factor_rgb = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
- //     .dst_factor_rgb = SG_,
       .src_factor_alpha = SG_BLENDFACTOR_ONE,
       .dst_factor_alpha = SG_BLENDFACTOR_ZERO
     }
@@ -89,10 +91,12 @@ ol_Image ol_image_from_sg(sg_image sg, int w, int h) {
 ol_Image ol_load_image(const char *path) {
   cp_image_t png = cp_load_png(path);
  // cp_flip_image_horizontal(&png);
-  size_t w = png.w, h = png.h;
+  size_t w = (size_t)png.w, h = (size_t)png.h;
   sg_image img = sg_make_image(&(sg_image_desc){
     .width = png.w,
     .height = png.h,
+    .min_filter = SG_FILTER_NEAREST,
+    .mag_filter = SG_FILTER_NEAREST,
     .data.subimage[0][0] = (sg_range){ png.pix,w*h*sizeof(cp_pixel_t) } ,
   });
   ol_Image res = {
@@ -156,7 +160,7 @@ void _ol_draw_tex_part(ol_Image *img, ol_Rect r, ol_Rect part, Vec4 modulate, bo
     .sizuv = vec2((float)part.w/(float)img->width, (float)part.h/(float)img->height),
     .mvp = mul4x4(
       mul4x4(
-        ortho4x4(sw, sh, 0.01f, 100.0f), 
+        ortho4x4(sw, sh, 0.001f, 100.0f), 
         translate4x4(vec3(-1.0f+(float)r.x*2.0f/sw, 1.0f-(float)r.y*2.0f/sh, 0.0))
       ), 
       scale4x4(vec3((float)r.w, (float)r.h, 1.0))
@@ -164,6 +168,30 @@ void _ol_draw_tex_part(ol_Image *img, ol_Rect r, ol_Rect part, Vec4 modulate, bo
   };
   sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_overlay_vs_params, &SG_RANGE(overlay_vs_params));
   sg_draw(0, (int)_ol_state.quad_shape.index_count, 1);
+}
+
+void ol_ninepatch(ol_Image *img, ol_Rect r, ol_NinePatch np, Vec4 modulate) {
+  const int SRC[2][3] = { 
+    /* X */ { np.inner.x, np.inner.w, np.outer.w-(np.inner.x+np.inner.w) },
+    /* Y */ { np.inner.y, np.inner.h, np.outer.h-(np.inner.y+np.inner.h) }
+  };
+  const int DST[2][3] = {
+    /* X */ { SRC[0][0], r.w-(SRC[0][0]+SRC[0][2]), SRC[0][2] },
+    /* Y */ { SRC[1][0], r.h-(SRC[1][0]+SRC[1][2]), SRC[1][2] },
+  };
+  int sx = np.outer.x;
+  int dx = r.x;
+  for (int i = 0; i < 3; i += 1) {
+    int sy = np.outer.y;
+    int dy = r.y;
+    for (int j = 0; j < 3; j += 1) {
+      _ol_draw_tex_part(img, (ol_Rect) { dx, dy, DST[0][i], DST[1][j] }, (ol_Rect) { sx, sy, SRC[0][i], SRC[1][j] }, modulate, false);
+      sy += SRC[1][j];
+      dy += DST[1][j];
+    }
+    sx += SRC[0][i];
+    dx += DST[0][i];
+  }
 }
 
 void ol_draw_tex_part_ex(ol_Image *img, ol_Rect r, ol_Rect part, Vec4 modulate) {

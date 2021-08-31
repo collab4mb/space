@@ -40,6 +40,7 @@
 //The list of enums/states will be getting bigger as we add more entities,
 //so move it to its own file
 #include "ai_type.h"
+#include "build.h"
 
 /* EntProps enable codepaths for game entities.
    These aren't boolean fields because that makes it more difficult to deal with
@@ -176,6 +177,7 @@ typedef struct {
     sg_pass passes[2];
     sg_pipeline pip;
   } blur;
+  build_State build;
 } State;
 static State *state;
 
@@ -222,6 +224,7 @@ static inline Ent *ent_all_iter(Ent *ent) {
 #include "ai.h"
 
 ol_Image test_image;
+ol_Image ui_atlas;
 ol_Image healthbar_image;
 ol_Font test_font;
 
@@ -308,8 +311,8 @@ void resize_framebuffers(void) {
     .width = sapp_widthf(),
     .height = sapp_heightf(),
     .pixel_format = SG_PIXELFORMAT_RGBA8,
-    .min_filter = SG_FILTER_LINEAR,
-    .mag_filter = SG_FILTER_LINEAR,
+    .min_filter = SG_FILTER_NEAREST,
+    .mag_filter = SG_FILTER_NEAREST,
     .wrap_u = SG_WRAP_CLAMP_TO_EDGE,
     .wrap_v = SG_WRAP_CLAMP_TO_EDGE,
     .sample_count = OFFSCREEN_SAMPLE_COUNT,
@@ -412,6 +415,7 @@ void init(void) {
   load_mesh(   Art_Laser,      Shader_Laser,   "./LASER.obj",    "./Mineral.png");
   load_mesh( Art_Mineral,   Shader_Standard, "./Mineral.obj",    "./Mineral.png");
 
+  ui_atlas = ol_load_image("./ui.png");
   test_font = ol_load_font("./Orbitron-Regular.ttf");
   ui_init(&test_font);
 
@@ -611,13 +615,12 @@ static void frame(void) {
   }
 
   ol_begin();
- 
   ui_screen((int)w, (int)h);
     ui_screen_anchor_xy(0.98, 0.02);
     ui_column(healthbar_image.width, 0);
       ui_screen(0, healthbar_image.height/2);
-        ui_image_part(&healthbar_image, (ol_Rect) { 0, healthbar_image.height/2, healthbar_image.width/1.5, healthbar_image.height/2 });
         ui_image_part(&healthbar_image, (ol_Rect) { 0, 0, healthbar_image.width, healthbar_image.height/2 });
+        ui_image_part(&healthbar_image, (ol_Rect) { 0, healthbar_image.height/2, healthbar_image.width/1.5, healthbar_image.height/2 });
       ui_screen_end();
 
       // Measure out the row
@@ -638,13 +641,21 @@ static void frame(void) {
       ui_screen_end();
     ui_column_end();
     ui_screen_anchor_xy(0.02, 0.02);
-    ui_textf("FPS: %.0lf", round(1000/elapsed));
+    //ui_textf("FPS: %.0lf", round(1000/elapsed));
   ui_screen_end();
+
+  build_draw(&state->build);
 
   for (ui_Command *cmd = ui_command_next(); cmd != NULL; cmd = ui_command_next()) {
     switch (cmd->kind) {
       case Ui_Cmd_Text:
         ol_draw_text(&test_font, cmd->data.text.text, cmd->rect.x, cmd->rect.y, vec4(1.0, 1.0, 1.0, 1.0));
+      break;
+      case Ui_Cmd_Frame:
+        ol_ninepatch(&ui_atlas, cmd->rect, (ol_NinePatch) { 
+          .inner = { 16, 16, 16, 16 },
+          .outer = { cmd->tag == 0 ? 0 : 48, 0, 48, 48 },
+        }, vec4(1.0, 0.2, 0.3, 1.0));
       break;
       case Ui_Cmd_Image:
         ol_draw_tex_part(cmd->data.image.img, cmd->rect, cmd->data.image.part);
@@ -680,7 +691,7 @@ static void frame(void) {
   sg_pass_action pass_action = {
     .colors[0] = { .action = SG_ACTION_CLEAR, .value = { 0.0f, 0.0f, 0.0f, 1.0f } }
   };
-  sg_begin_default_pass(&pass_action, (int)w, (int)h);
+  sg_begin_default_pass(&pass_action, sapp_width(), sapp_height());
   sg_apply_pipeline(state->fsq.pip);
   sg_apply_bindings(&(sg_bindings) {
     .vertex_buffers[0] = state->fsq.quad_vbuf,
@@ -709,6 +720,8 @@ static void event(const sapp_event *ev) {
         if (ev->key_code == SAPP_KEYCODE_ESCAPE)
           sapp_request_quit();
       #endif
+        if (ev->key_code == SAPP_KEYCODE_TAB)
+          build_toggle(&state->build);
     } break;
     case SAPP_EVENTTYPE_KEY_UP: {
         input_key_update(ev->key_code,0);
