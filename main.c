@@ -110,7 +110,6 @@ typedef struct Ent{
 
   /* tied to EntProp_PassiveRotate */
   Vec3 passive_rotate_axis;
-  float passive_rotate_angle;
 
   /* tied to EntProp_PickUp */
   uint64_t pick_up_after_tick;
@@ -355,23 +354,21 @@ void init(void) {
     .pos = { -1.5, 6.5 },
     .scale = { 5.0f, 4.0f, 1.0f },
     .height = -1.0f,
-    .collider.size = 9.0f,
+    .collider.size = 10.0f,
     .collider.shape = Shape_Line,
     .collider.weight = 1000.0f,
   });
 
-  for (int i = -1; i < 2; i += 2)
-    for (int h = -1; h < 2; h += 2) {
-      Ent *pillar = add_ent((Ent) {
-        .art = Art_Pillar,
-        .pos = { -1.5 + i * 4.2, 6.5 },
-        .height = -1.0f + h * 1.7f,
-        .x_rot = m_min(h * PI_f, 0),
-        .passive_rotate_axis = vec3_y,
-      });
-      give_ent_prop(pillar, EntProp_PassiveRotate);
-    }
-
+  for (int i = -1; i < 2; i += 2) {
+    Ent *pillar = add_ent((Ent) {
+      .art = Art_Pillar,
+      .pos = { -1.5 + i * 4.2, 6.5 },
+      .height = 0.0,
+      .x_rot = 0,
+      .passive_rotate_axis = vec3_y,
+    });
+    give_ent_prop(pillar, EntProp_PassiveRotate);
+  }
   #define ASTEROIDS_PER_RING (7)
   #define ASTEROID_RINGS (3)
   #define ASTEROID_RING_SPACING (20.0f)
@@ -505,7 +502,7 @@ void init(void) {
 
 /* naively renders with n draw calls per entity
  * TODO: optimize for fewer draw calls */
-static void draw_ent(Mat4 vp, Ent *ent) {
+static void draw_ent_internal(Mat4 vp, Ent *ent) {
   Mat4 m = translate4x4(vec3(ent->pos.x, ent->height, ent->pos.y));
 
   m = mul4x4(m, y_rotate4x4(ent->angle));
@@ -515,7 +512,7 @@ static void draw_ent(Mat4 vp, Ent *ent) {
     m = mul4x4(m, z_rotate4x4(state->player_turn_accel*-2.0f));
   if (has_ent_prop(ent, EntProp_PassiveRotate))
     m = mul4x4(m, rotate4x4(ent->passive_rotate_axis,
-                            ent->passive_rotate_angle += 0.01f));
+                            (float)state->tick/70.0f));
 
   Vec3 scale = (magmag3(ent->scale) == 0.0f) ? vec3_f(1.0f) : ent->scale;
   if (ent->art == Art_Ship) scale = mul3_f(scale, 0.3f);
@@ -548,6 +545,20 @@ static void draw_ent(Mat4 vp, Ent *ent) {
 
 
   sg_draw(0, mesh->index_count, 1);
+}
+
+static void draw_ent(Mat4 vp, Ent *ent) {
+  if (ent->art == Art_Pillar) {
+    Ent copy = *ent;
+    copy.height = 2;
+    draw_ent_internal(vp, &copy);
+    copy.x_rot = PI_f;
+    copy.height = -4;
+    copy.angle = -copy.angle;
+    draw_ent_internal(vp, &copy);
+  }
+  else
+    draw_ent_internal(vp, ent);
 }
 
 static void tick(void) {
@@ -623,12 +634,23 @@ static void frame(void) {
     .colors[1] = { .action = SG_ACTION_CLEAR, .value = { 0.0f, 0.0f, 0.0f, 1.0f } }
   });
 
+  sg_apply_pipeline(state->pip[Shader_Standard]);
+  draw_ent(vp, &(Ent) {
+    .art = Art_Pillar,
+    .pos = add2(state->player->pos, mul2_f(vec2_swap(vec2_rot(state->player->angle)), 10.0)),
+    .height = 0.0,
+    .x_rot = 0,
+    .passive_rotate_axis = vec3_y,
+  });
+
   for (Shader shd = 0; shd < Shader_COUNT; shd++) {
     sg_apply_pipeline(state->pip[shd]);
     for (Ent *ent = 0; (ent = ent_all_iter(ent));)
       if (state->meshes[ent->art].shader == shd)
         draw_ent(vp, ent);
   }
+
+
 
   ol_begin();
   ui_screen((int)w, (int)h);

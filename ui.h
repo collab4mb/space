@@ -62,6 +62,7 @@ typedef struct {
   size_t layout_count;
   size_t measuremode_counter;
   size_t command_iter;
+  int margin;
   int offset_x, offset_y;
 } ui_State;
 
@@ -155,12 +156,21 @@ static ol_Rect _ui_query_bounds(int width, int height) {
   }
   rect.x += curr->bounds.x;
   rect.y += curr->bounds.y;
+  rect.x += _ui_state.margin;
+  rect.y += _ui_state.margin;
+  rect.w -= _ui_state.margin*2;
+  rect.h -= _ui_state.margin*2;
+  _ui_state.margin = 0;
   return rect;
 }
 
 static void ui_setoffset(int x, int y) {
   _ui_state.offset_x = x;
   _ui_state.offset_y = y;
+}
+
+static void ui_margin(int size) {
+  _ui_state.margin += size;
 }
 
 static void ui_gap(int gap) {
