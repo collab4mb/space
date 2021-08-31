@@ -36,8 +36,8 @@ typedef struct {
 
 void ol_init() {
   const float vertices[] = {
-    0, -1, 0, 1,
-    1, -1, 1, 1,
+    0, 1,  0, 1,
+    1, 1,  1, 1,
     1, 0,  1, 0,
     0, 0,  0, 0
   };
@@ -57,7 +57,7 @@ void ol_init() {
   _ol_state.pip = sg_make_pipeline(&(sg_pipeline_desc) {
     .layout = {
       .attrs = {
-        [ATTR_overlay_vs_position].format = SG_VERTEXFORMAT_FLOAT2,
+        [ATTR_overlay_vs_vert_pos].format = SG_VERTEXFORMAT_FLOAT2,
         [ATTR_overlay_vs_uv].format = SG_VERTEXFORMAT_FLOAT2,
       }
     },
@@ -151,20 +151,14 @@ void _ol_draw_tex_part(ol_Image *img, ol_Rect r, ol_Rect part, Vec4 modulate, bo
   _ol_state.bind.vertex_buffers[0] = _ol_state.quad_shape.vbuf;
   _ol_state.bind.fs_images[SLOT_tex] = img->sg;
   sg_apply_bindings(&_ol_state.bind); 
-  const float sw = sapp_widthf();
-  const float sh = sapp_heightf();
   overlay_vs_params_t overlay_vs_params = { 
-    .modulate = modulate,
     .istxt = istxt ? 1.0 : 0.0,
     .minuv = vec2((float)part.x/(float)img->width, (float)part.y/(float)img->height),
     .sizuv = vec2((float)part.w/(float)img->width, (float)part.h/(float)img->height),
-    .mvp = mul4x4(
-      mul4x4(
-        ortho4x4(sw, sh, 0.001f, 100.0f), 
-        translate4x4(vec3(-1.0f+(float)r.x*2.0f/sw, 1.0f-(float)r.y*2.0f/sh, 0.0))
-      ), 
-      scale4x4(vec3((float)r.w, (float)r.h, 1.0))
-    )
+    .pos = vec2(r.x, r.y),
+    .size = vec2(r.w, r.h),
+    .resolution = vec2(sapp_widthf(), sapp_heightf()),
+    .modulate = modulate,
   };
   sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_overlay_vs_params, &SG_RANGE(overlay_vs_params));
   sg_draw(0, (int)_ol_state.quad_shape.index_count, 1);
