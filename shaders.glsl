@@ -188,9 +188,10 @@ out float fs_istxt;
 void main() {
   fs_istxt = istxt;
   fs_modulate = modulate;
-  fs_uv = uv*sizuv+minuv;
+  fs_uv = minuv + uv * sizuv;
   vec2 screen_pos = pos + vert_pos * size;
-  screen_pos /= resolution * 0.5;
+  screen_pos = screen_pos*2.0/resolution;
+  screen_pos = vec2(screen_pos.x - 1.0, 1.0 - screen_pos.y);
   gl_Position = vec4(screen_pos, -0.1, 1);
 }
 @end

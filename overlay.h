@@ -36,10 +36,10 @@ typedef struct {
 
 void ol_init() {
   const float vertices[] = {
-    0, 1,  0, 1,
-    1, 1,  1, 1,
-    1, 0,  1, 0,
-    0, 0,  0, 0
+    0, 1,   0, 1,
+    1, 1,   1, 1,
+    1, 0,   1, 0,
+    0, 0,   0, 0
   };
   const uint16_t indices[] = {
     0, 1, 2,
