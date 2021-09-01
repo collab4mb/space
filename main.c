@@ -520,8 +520,8 @@ static void draw_ent(Mat4 vp, Ent *ent) {
       .time = ent->time_since_last_collision,
     };
     sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_force_field_fs_params, &SG_RANGE(fs_params));
-  } else {
-    mesh_fs_params_t fs_params = { .bloom = 0.0f }; // ent->bloom };
+  } else if (mesh->shader == Shader_Standard) {
+    mesh_fs_params_t fs_params = { .bloom = ent->bloom };
     sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_mesh_fs_params, &SG_RANGE(fs_params));
   }
   vs_params_t vs_params = { .view_proj = vp, .model = m };
