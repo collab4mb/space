@@ -223,14 +223,21 @@ void main() {
 
 @fs fsq_fs
 uniform sampler2D tex;
-uniform sampler2D bloomed;
+uniform sampler2D blur0;
+uniform sampler2D blur1;
+uniform sampler2D blur2;
+uniform sampler2D blur3;
 
 in vec2 uv;
 
 out vec4 frag_color;
 
 void main() {
-  vec3 t = texture(tex, uv).rgb + texture(bloomed, uv).rgb;
+  vec3 t = texture(  tex, uv).rgb +
+           texture(blur0, uv).rgb +
+           texture(blur1, uv).rgb +
+           texture(blur2, uv).rgb +
+           texture(blur3, uv).rgb ;
   frag_color = vec4(t, 1);
 }
 @end

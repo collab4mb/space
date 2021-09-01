@@ -153,6 +153,7 @@ typedef struct {
 
 #define OFFSCREEN_SAMPLE_COUNT (4)
 #define STATE_MAX_ENTS (1 << 12)
+#define BLUR_PASSES (4)
 typedef struct {
   sg_pipeline pip[Shader_COUNT];
   Mesh meshes[Art_COUNT];
@@ -170,8 +171,8 @@ typedef struct {
     sg_pipeline pip;
   } fsq;
   struct {
-    sg_image imgs[2];
-    sg_pass passes[2];
+    sg_image imgs[BLUR_PASSES][2];
+    sg_pass passes[BLUR_PASSES][2];
     sg_pipeline pip;
   } blur;
 } State;
@@ -294,16 +295,17 @@ void resize_framebuffers(void) {
   sg_destroy_image(state->offscreen.color_img);
   sg_destroy_image(state->offscreen.depth_img);
   sg_destroy_image(state->offscreen.bright_img);
-  for (int i = 0; i < 2; i++) {
-    sg_destroy_image(state->blur.imgs[i]);
-    sg_destroy_pass(state->blur.passes[i]);
-  }
+  for (int i = 0; i < BLUR_PASSES; i++)
+    for (int h = 0; h < 2; h++) {
+      sg_destroy_image(state->blur.imgs[i][h]);
+      sg_destroy_pass(state->blur.passes[i][h]);
+    }
 
   /* a render pass with one color- and one depth-attachment image */
   sg_image_desc img_desc = {
     .render_target = true,
-    .width = sapp_widthf(),
-    .height = sapp_heightf(),
+    .width = sapp_width(),
+    .height = sapp_height(),
     .pixel_format = SG_PIXELFORMAT_RGBA8,
     .min_filter = SG_FILTER_LINEAR,
     .mag_filter = SG_FILTER_LINEAR,
@@ -314,12 +316,16 @@ void resize_framebuffers(void) {
   state->offscreen.color_img = sg_make_image(&img_desc);
   state->offscreen.bright_img = sg_make_image(&img_desc);
 
-  for (int i = 0; i < 2; i++) {
-    state->blur.imgs[i] = sg_make_image(&img_desc);
-    state->blur.passes[i] = sg_make_pass(&(sg_pass_desc) {
-      .color_attachments[0].image = state->blur.imgs[i]
-    });
-  }
+  sg_image_desc blur_img_desc = img_desc;
+  for (int i = 0; i < BLUR_PASSES; i++)
+    for (int h = 0; h < 2; h++) {
+      state->blur.imgs[i][h] = sg_make_image(&blur_img_desc);
+      state->blur.passes[i][h] = sg_make_pass(&(sg_pass_desc) {
+        .color_attachments[0].image = state->blur.imgs[i][h]
+      });
+      blur_img_desc.width /= 2;
+      blur_img_desc.height /= 2;
+    }
 
   img_desc.pixel_format = SG_PIXELFORMAT_DEPTH_STENCIL;
   state->offscreen.depth_img = sg_make_image(&img_desc);
@@ -619,24 +625,23 @@ static void frame(void) {
 
   sg_end_pass();
 
-  int horizontal = 1;
-  for (int i = 0; i < 16; i++) {
-    sg_begin_pass(state->blur.passes[horizontal], &(sg_pass_action) {
-      .colors[0] = { .action = SG_ACTION_LOAD }
-    });
-    sg_apply_pipeline(state->blur.pip);
-    sg_apply_bindings(&(sg_bindings) {
-      .vertex_buffers[0] = state->fsq.quad_vbuf,
-      .fs_images = {
-        [SLOT_tex] = i ? state->blur.imgs[!horizontal] : state->offscreen.bright_img
-      }
-    });
-    blur_fs_params_t fs_params = { .hori = vec2(horizontal, !horizontal) };
-    sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_blur_fs_params, &SG_RANGE(fs_params));
-    sg_draw(0, 4, 1);
-    sg_end_pass();
-    horizontal = !horizontal;
-  }
+  for (int i = 0; i < BLUR_PASSES; i++)
+    for (int hori = 0; hori < 2; hori++) {
+      sg_begin_pass(state->blur.passes[i][hori], &(sg_pass_action) {
+        .colors[0] = { .action = SG_ACTION_LOAD }
+      });
+      sg_apply_pipeline(state->blur.pip);
+      sg_apply_bindings(&(sg_bindings) {
+        .vertex_buffers[0] = state->fsq.quad_vbuf,
+        .fs_images = {
+          [SLOT_tex] = hori ? state->blur.imgs[i][!hori] : state->offscreen.bright_img
+        }
+      });
+      blur_fs_params_t fs_params = { .hori = vec2(hori, !hori) };
+      sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_blur_fs_params, &SG_RANGE(fs_params));
+      sg_draw(0, 4, 1);
+      sg_end_pass();
+    }
 
   sg_pass_action pass_action = {
     .colors[0] = { .action = SG_ACTION_CLEAR, .value = { 0.0f, 0.0f, 0.0f, 1.0f } }
@@ -647,7 +652,10 @@ static void frame(void) {
     .vertex_buffers[0] = state->fsq.quad_vbuf,
     .fs_images = {
       [SLOT_tex] = state->offscreen.color_img,
-      [SLOT_bloomed] = state->blur.imgs[!horizontal]
+      [SLOT_blur0] = state->blur.imgs[0][1],
+      [SLOT_blur1] = state->blur.imgs[1][1],
+      [SLOT_blur2] = state->blur.imgs[2][1],
+      [SLOT_blur3] = state->blur.imgs[3][1],
     }
   });
   sg_draw(0, 4, 1);
