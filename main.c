@@ -170,7 +170,7 @@ typedef struct {
   sg_pipeline pip[Shader_COUNT];
   Mesh meshes[Art_COUNT];
   Ent ents[STATE_MAX_ENTS];
-  Ent *player;
+  GenDex player;
   float player_turn_accel;
   uint64_t frame, tick;
   double fixed_tick_accumulator;
@@ -349,7 +349,7 @@ void init(void) {
 
   state = calloc(sizeof(State), 1);
 
-  state->player = add_ent((Ent) {
+  Ent *player = add_ent((Ent) {
     .art = Art_Ship,
     .pos = { -1, 2.5 },
     .collider.size = 2.0f,
@@ -357,7 +357,8 @@ void init(void) {
     .health = 10,
     .damage = 1,
   });
-  give_ent_prop(state->player,EntProp_Destructible);
+  state->player = get_gendex(player);
+  give_ent_prop(player,EntProp_Destructible);
 
   add_ent((Ent) {
     .art = Art_Plane,
@@ -509,7 +510,7 @@ static void draw_ent(Mat4 vp, Ent *ent) {
   Mat4 m = translate4x4(vec3(ent->pos.x, ent->height, ent->pos.y));
 
   m = mul4x4(m, y_rotate4x4(ent->angle));
-  if (ent == state->player)
+  if (ent == try_gendex(state->player))
     m = mul4x4(m, z_rotate4x4(state->player_turn_accel*-2.0f));
   if (has_ent_prop(ent, EntProp_PassiveRotate))
     m = mul4x4(m, rotate4x4(ent->passive_rotate_axis,
@@ -551,7 +552,10 @@ static void draw_ent(Mat4 vp, Ent *ent) {
 static void tick(void) {
   state->tick++;
 
-  player_update(state->player);
+  Ent *player = try_gendex(state->player);
+  if(player!=NULL)
+    player_update(player);
+
   for (Ent *ent = 0; (ent = ent_all_iter(ent));) {
     if(has_ent_prop(ent,EntProp_HasAI))
       ai_run(ent);
@@ -569,8 +573,8 @@ static void tick(void) {
 
     if (has_ent_prop(ent, EntProp_PickUp)) {
       ent->height = sinf(ent->pos.x + ent->pos.y + (float) state->tick / 14.0) * 0.3f;
-      if (ent->pick_up_after_tick <= state->tick) {
-        Ent *p = state->player;
+      Ent *p = try_gendex(state->player);
+      if (p!=NULL&&ent->pick_up_after_tick <= state->tick) {
 
         #define SUCK_DIST (6.0f)
         Vec2 delta = sub2(p->pos, ent->pos);
@@ -601,10 +605,10 @@ static void frame(void) {
   Mat4 proj = perspective4x4(1.047f, w/h, 0.01f, 100.0f);
 
   static float cam_angle = 0.0f;
-  cam_angle = lerp(cam_angle, state->player->angle, 0.08);
+  cam_angle = lerp(cam_angle, state->player.index->angle, 0.08);
   Vec2 cam_dir = vec2_swap(vec2_rot(cam_angle));
 
-  Vec3 plr_p = {state->player->pos.x, 0.0f, state->player->pos.y};
+  Vec3 plr_p = {state->player.index->pos.x, 0.0f, state->player.index->pos.y};
   Vec3 cam_o = {           cam_dir.x, 1.0f,          cam_dir.y};
   Mat4 view = look_at4x4(
     add3(plr_p, mul3(vec3(-5,  3, -5), cam_o)),

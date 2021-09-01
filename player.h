@@ -7,7 +7,7 @@ static void player_update(Ent *player) {
     angle_delta -= 0.05f;
   if (input_key_down(SAPP_KEYCODE_RIGHT))
     angle_delta += 0.05f;
-  state->player->angle += angle_delta;
+  player->angle += angle_delta;
   state->player_turn_accel += angle_delta;
   state->player_turn_accel *= 0.8;
   Vec2 p_dir = vec2_swap(vec2_rot(player->angle));

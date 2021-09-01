@@ -24,9 +24,11 @@
 //Function implementations
 
 static AI_statenum _ai_idle(Ent *ent) {
-  if(magmag2(sub2(ent->pos,state->player->pos))<m_square(50.0f)&&
-     dot2(vec2_swap(vec2_rot(ent->angle)),norm2(sub2(state->player->pos,ent->pos))) > 0.5) {
-    ent->ai.target = get_gendex(state->player);
+  Ent *player = try_gendex(state->player);
+
+  if(player!=NULL&&magmag2(sub2(ent->pos,player->pos))<m_square(50.0f)&&
+     dot2(vec2_swap(vec2_rot(ent->angle)),norm2(sub2(player->pos,ent->pos))) > 0.5) {
+    ent->ai.target = state->player;
     return AI_STATE_MOVE;
   }
 
