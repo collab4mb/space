@@ -40,7 +40,6 @@
 //The list of enums/states will be getting bigger as we add more entities,
 //so move it to its own file
 #include "ai_type.h"
-#include "build.h"
 
 /* EntProps enable codepaths for game entities.
    These aren't boolean fields because that makes it more difficult to deal with
@@ -177,7 +176,6 @@ typedef struct {
     sg_pass passes[2];
     sg_pipeline pip;
   } blur;
-  build_State build;
 } State;
 static State *state;
 
@@ -219,6 +217,7 @@ static inline Ent *ent_all_iter(Ent *ent) {
   return NULL;
 }
 
+#include "build.h"
 #include "collision.h"
 #include "player.h"
 #include "ai.h"
@@ -638,17 +637,7 @@ static void frame(void) {
     .colors[1] = { .action = SG_ACTION_CLEAR, .value = { 0.0f, 0.0f, 0.0f, 1.0f } }
   });
 
-  if (state->build.appearing || state->build.appear_anim > 0) {
-    sg_apply_pipeline(state->pip[Shader_Standard]);
-    draw_ent(vp, &(Ent) {
-      .art = Art_Pillar,
-      .pos = add2(state->player->pos, mul2_f(vec2_swap(vec2_rot(state->player->angle)), 10.0)),
-      .height = 0,
-      .x_rot = 0,
-      .transparency = lerp(0, 0.5, fmax(fmin(state->build.appear_anim, 1.0), 0.0)),
-      .passive_rotate_axis = vec3_y,
-    });
-  }
+  build_draw_3d(vp);
 
   for (Shader shd = 0; shd < Shader_COUNT; shd++) {
     sg_apply_pipeline(state->pip[shd]);
@@ -686,10 +675,10 @@ static void frame(void) {
       ui_screen_end();
     ui_column_end();
     ui_screen_anchor_xy(0.02, 0.02);
-    //ui_textf("FPS: %.0lf", round(1000/elapsed));
+    ui_textf("FPS: %.0lf", round(1000/elapsed));
   ui_screen_end();
 
-  build_draw(&state->build);
+  build_draw();
 
   for (ui_Command *cmd = ui_command_next(); cmd != NULL; cmd = ui_command_next()) {
     switch (cmd->kind) {
@@ -758,6 +747,8 @@ static void cleanup(void) {
 }
 
 static void event(const sapp_event *ev) {
+  if (build_event(ev)) return;
+
   switch (ev->type) {
     case SAPP_EVENTTYPE_KEY_DOWN: {
         input_key_update(ev->key_code,1);
@@ -765,8 +756,6 @@ static void event(const sapp_event *ev) {
         if (ev->key_code == SAPP_KEYCODE_ESCAPE)
           sapp_request_quit();
       #endif
-        if (ev->key_code == SAPP_KEYCODE_TAB)
-          build_toggle(&state->build);
     } break;
     case SAPP_EVENTTYPE_KEY_UP: {
         input_key_update(ev->key_code,0);

@@ -127,7 +127,7 @@ static bool _obj_isint(Parser *self) {
 static float _obj_float(Parser *self) {
   _obj_skip(self);
   char *end = (char*)self->src;
-  float r = strtod(self->src, &end);
+  float r = strtof(self->src, &end);
   assert(end != self->src && "Obj: Supplied empty float");
   self->src = end;
   return r;
