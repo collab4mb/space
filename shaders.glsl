@@ -168,6 +168,38 @@ void main() {
 
 // ---------------------------------------------------- //
 
+@vs healthbar_vs
+in vec2 pos;
+in vec2 uv;
+
+out vec2 fs_uv;
+
+void main() {
+  gl_Position = vec4(pos, 0.01, 1.0);
+  fs_uv = uv;
+}
+@end
+
+@fs healthbar_fs
+// uniform healthbar_vs_params {
+//   vec2 resolution;
+//   float time;
+// }
+
+in vec2 fs_uv;
+layout (location = 0) out vec4 frag_color;
+layout (location = 1) out vec4 bright_color;
+
+void main() {
+  frag_color = vec4(fs_uv, 1.0, 1.0);
+  bright_color = vec4(0.0, 0.0, 0.0, 1.0);
+}
+@end
+
+@program healthbar healthbar_vs healthbar_fs
+
+// ---------------------------------------------------- //
+
 @vs overlay_vs
 uniform overlay_vs_params {
   float istxt;

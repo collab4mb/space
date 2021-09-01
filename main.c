@@ -164,6 +164,11 @@ typedef struct {
   size_t index_count;
 } Mesh;
 
+#define MAX_HEALTHBARS (1 << 4)
+typedef struct {
+  Vec2 pos, uv;
+} HealthbarVert;
+
 #define OFFSCREEN_SAMPLE_COUNT (4)
 #define STATE_MAX_ENTS (1 << 12)
 typedef struct {
@@ -174,6 +179,12 @@ typedef struct {
   float player_turn_accel;
   uint64_t frame, tick;
   double fixed_tick_accumulator;
+  struct {
+    sg_buffer vbuf, ibuf;
+    HealthbarVert verts[MAX_HEALTHBARS * 4];
+    uint16_t      indxs[MAX_HEALTHBARS * 6];
+    sg_pipeline pip;
+  } healthbar;
   struct {
     sg_image color_img, bright_img, depth_img;
     sg_pass pass;
@@ -473,6 +484,26 @@ void init(void) {
   desc.shader = sg_make_shader(force_field_shader_desc(sg_query_backend()));
   state->pip[Shader_ForceField] = sg_make_pipeline(&desc);
 
+  {
+    sg_pipeline_desc hp_desc = desc;
+    hp_desc.shader = sg_make_shader(healthbar_shader_desc(sg_query_backend()));
+    hp_desc.layout = (sg_layout_desc) {
+      .attrs[ATTR_healthbar_vs_pos].format = SG_VERTEXFORMAT_FLOAT2,
+      .attrs[ATTR_healthbar_vs_uv].format  = SG_VERTEXFORMAT_FLOAT2,
+    };
+    hp_desc.primitive_type = SG_PRIMITIVETYPE_TRIANGLE_STRIP;
+    state->healthbar.pip = sg_make_pipeline(&hp_desc);
+    state->healthbar.vbuf = sg_make_buffer(&(sg_buffer_desc) {
+      .size = sizeof(state->healthbar.verts),
+      .usage = SG_USAGE_STREAM,
+    });
+    state->healthbar.ibuf = sg_make_buffer(&(sg_buffer_desc) {
+      .size = sizeof(state->healthbar.indxs),
+      .usage = SG_USAGE_STREAM,
+      .type = SG_BUFFERTYPE_INDEXBUFFER,
+    });
+  }
+
   test_image = ol_load_image("./test_tex.png");
 
   /* a vertex buffer to render a fullscreen rectangle */
@@ -632,6 +663,25 @@ static void frame(void) {
       if (state->meshes[ent->art].shader == shd)
         draw_ent(vp, ent);
   }
+  sg_apply_pipeline(state->healthbar.pip);
+  state->healthbar.verts[0] = (HealthbarVert) { 0.0f, 0.0f,  0.0f, 0.0f };
+  state->healthbar.verts[1] = (HealthbarVert) { 1.0f, 0.0f,  1.0f, 0.0f };
+  state->healthbar.verts[2] = (HealthbarVert) { 1.0f, 1.0f,  1.0f, 1.0f };
+  state->healthbar.verts[3] = (HealthbarVert) { 0.0f, 1.0f,  0.0f, 1.0f };
+  memcpy(state->healthbar.indxs, &((uint16_t[]) { 0, 1, 2, 0, 3, 2 }), sizeof(uint16_t) * 6);
+  sg_update_buffer(state->healthbar.vbuf, &(sg_range) {
+    .ptr = state->healthbar.verts, 
+    .size = sizeof(HealthbarVert) * 4,
+  });
+  sg_update_buffer(state->healthbar.ibuf, &(sg_range) {
+    .ptr = state->healthbar.indxs, 
+    .size = sizeof(uint16_t) * 6,
+  });
+  sg_apply_bindings(&(sg_bindings) {
+    .vertex_buffers[0] = state->healthbar.vbuf,
+    .index_buffer = state->healthbar.ibuf,
+  });
+  sg_draw(0, 6, 1);
 
   ol_begin();
 
