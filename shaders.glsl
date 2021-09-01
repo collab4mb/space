@@ -4,8 +4,8 @@
 
 @vs vs
 uniform vs_params {
-    mat4 view_proj;
-    mat4 model;
+  mat4 view_proj;
+  mat4 model;
 };
 
 in vec3 position;
@@ -63,7 +63,7 @@ void main() {
   frag_color = vec4(object_color * light, 1);
 
   float brightness = dot(frag_color.rgb, vec3(0.2126, 0.7152, 0.0722));
-  bright_color = vec4(step(1.0 - bloom, frag_color.rgb), 1);
+  bright_color = vec4(step(brightness, bloom) * frag_color.rgb, 1);
 }
 @end
 
@@ -90,9 +90,6 @@ void main() {
 
 @fs laser_fs
 uniform sampler2D tex;
-uniform mesh_fs_params {
-  float bloom;
-};
 
 in vec2 fs_uv;
 
@@ -104,7 +101,7 @@ void main() {
   frag_color = vec4(object_color, 1);
 
   float brightness = dot(frag_color.rgb, vec3(0.2126, 0.7152, 0.0722));
-  bright_color = vec4(step(1.0 - bloom, frag_color.rgb), 1);
+  bright_color = vec4(step(brightness, 1.0) * frag_color.rgb, 1);
 }
 @end
 
@@ -161,6 +158,9 @@ void main() {
 
   float d = (hex(uv * 2.0) + bang * 0.4) * center;
   frag_color = vec4(1, 0, 1, 1) * d * 0.7;
+
+  float brightness = dot(frag_color.rgb, vec3(0.2126, 0.7152, 0.0722));
+  bright_color = vec4(step(brightness, 0.04) * frag_color.rgb, 1);
 }
 @end
 
@@ -228,14 +228,21 @@ void main() {
 
 @fs fsq_fs
 uniform sampler2D tex;
-uniform sampler2D bloomed;
+uniform sampler2D blur0;
+uniform sampler2D blur1;
+uniform sampler2D blur2;
+uniform sampler2D blur3;
 
 in vec2 uv;
 
 out vec4 frag_color;
 
 void main() {
-  vec3 t = texture(tex, uv).rgb + texture(bloomed, uv).rgb;
+  vec3 t = texture(  tex, uv).rgb +
+           texture(blur0, uv).rgb +
+           texture(blur1, uv).rgb +
+           texture(blur2, uv).rgb +
+           texture(blur3, uv).rgb ;
   frag_color = vec4(t, 1);
 }
 @end
