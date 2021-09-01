@@ -173,11 +173,13 @@ uniform overlay_vs_params {
   float istxt;
   vec2 minuv;
   vec2 sizuv;
-  mat4 mvp;
+  vec2 pos;
+  vec2 size;
+  vec2 resolution;
   vec4 modulate;
 };
 
-in vec2 position;
+in vec2 vert_pos;
 in vec2 uv;
 out vec2 fs_uv;
 out vec4 fs_modulate;
@@ -186,8 +188,11 @@ out float fs_istxt;
 void main() {
   fs_istxt = istxt;
   fs_modulate = modulate;
-  fs_uv = uv*sizuv+minuv;
-  gl_Position = mvp * vec4(position, -0.1, 1.0);
+  fs_uv = minuv + uv * sizuv;
+  vec2 screen_pos = pos + vert_pos * size;
+  screen_pos = screen_pos*2.0/resolution;
+  screen_pos = vec2(screen_pos.x - 1.0, 1.0 - screen_pos.y);
+  gl_Position = vec4(screen_pos, -0.1, 1);
 }
 @end
 

@@ -40,9 +40,11 @@
 typedef struct Ent Ent;
 typedef struct GenDex GenDex;
 
+#include "ui.h"
 //The list of enums/states will be getting bigger as we add more entities,
 //so move it to its own file
 #include "ai_type.h"
+#include "build.h"
 
 /* EntProps enable codepaths for game entities.
    These aren't boolean fields because that makes it more difficult to deal with
@@ -172,6 +174,7 @@ typedef struct {
   Ent ents[STATE_MAX_ENTS];
   GenDex player;
   float player_turn_accel;
+  size_t gem_count;
   uint64_t frame, tick;
   double fixed_tick_accumulator;
   struct {
@@ -187,6 +190,7 @@ typedef struct {
     sg_pass passes[2];
     sg_pipeline pip;
   } blur;
+  build_State build;
 } State;
 static State *state;
 
@@ -233,6 +237,8 @@ static inline Ent *ent_all_iter(Ent *ent) {
 #include "ai.h"
 
 ol_Image test_image;
+ol_Image ui_atlas;
+ol_Image healthbar_image;
 ol_Font test_font;
 
 void load_texture(Art art, const char *texture) {
@@ -318,8 +324,8 @@ void resize_framebuffers(void) {
     .width = sapp_widthf(),
     .height = sapp_heightf(),
     .pixel_format = SG_PIXELFORMAT_RGBA8,
-    .min_filter = SG_FILTER_LINEAR,
-    .mag_filter = SG_FILTER_LINEAR,
+    .min_filter = SG_FILTER_NEAREST,
+    .mag_filter = SG_FILTER_NEAREST,
     .wrap_u = SG_WRAP_CLAMP_TO_EDGE,
     .wrap_v = SG_WRAP_CLAMP_TO_EDGE,
     .sample_count = OFFSCREEN_SAMPLE_COUNT,
@@ -433,7 +439,9 @@ void init(void) {
   load_mesh(   Art_Laser,      Shader_Laser,   "./LASER.obj",    "./Mineral.png");
   load_mesh( Art_Mineral,   Shader_Standard, "./Mineral.obj",    "./Mineral.png");
 
+  ui_atlas = ol_load_image("./ui.png");
   test_font = ol_load_font("./Orbitron-Regular.ttf");
+  ui_init(&test_font);
 
 
   ol_init();
@@ -473,7 +481,8 @@ void init(void) {
   desc.shader = sg_make_shader(force_field_shader_desc(sg_query_backend()));
   state->pip[Shader_ForceField] = sg_make_pipeline(&desc);
 
-  test_image = ol_load_image("./test_tex.png");
+  test_image = ol_load_image("./Gem.png");
+  healthbar_image = ol_load_image("./healthbar.png");
 
   /* a vertex buffer to render a fullscreen rectangle */
   state->fsq.quad_vbuf = sg_make_buffer(&(sg_buffer_desc){
@@ -579,7 +588,12 @@ static void tick(void) {
         #define SUCK_DIST (6.0f)
         Vec2 delta = sub2(p->pos, ent->pos);
         float dist = mag2(delta);
+        
 
+        if (dist < 0.3f) {
+          state->gem_count += 1;
+          take_ent_prop(ent, EntProp_Active);
+        }
         if (dist < 0.3f)
           remove_ent(ent);
         else if (dist < SUCK_DIST)
@@ -594,7 +608,8 @@ static void tick(void) {
 
 static void frame(void) {
   #define TICK_MS (1000.0f / 60.0f)
-  state->fixed_tick_accumulator += stm_ms(stm_laptime(&state->frame));
+  double elapsed = stm_ms(stm_laptime(&state->frame));
+  state->fixed_tick_accumulator += elapsed;
   while (state->fixed_tick_accumulator > TICK_MS) {
     state->fixed_tick_accumulator -= TICK_MS;
     tick();
@@ -634,27 +649,62 @@ static void frame(void) {
   }
 
   ol_begin();
+  ui_screen((int)w, (int)h);
+    ui_screen_anchor_xy(0.98, 0.02);
+    ui_column(healthbar_image.width, 0);
+      ui_screen(0, healthbar_image.height/2);
+        ui_image_part(&healthbar_image, (ol_Rect) { 0, 0, healthbar_image.width, healthbar_image.height/2 });
+        ui_image_part(&healthbar_image, (ol_Rect) { 0, healthbar_image.height/2, healthbar_image.width/1.5, healthbar_image.height/2 });
+      ui_screen_end();
 
-  const char *text = "To begin, approach an asteroid and press [SPACE]";
-  ol_Rect rect = ol_measure_text(&test_font, text, 20, 30);
-  rect.x -= 40;
-  rect.y -= 40;
-  rect.w += 80;
-  rect.h += 80;
-  rect.x += 40;
-  rect.y += 40;
-  ol_draw_rect(vec4(0.1, 0.2, 0.3, 0.4), rect);
-  rect.x += 10;
-  rect.y += 10;
-  rect.w -= 20;
-  rect.h -= 20;
-  ol_draw_rect(vec4(0.1, 0.2, 0.3, 0.4), rect);
-  ol_draw_text(&test_font, text, 60, 70, vec4(0.4, 0.8, 1.0, 1.0));
+      // Measure out the row
+      ui_measuremode();
+        ui_row(0, 0);
+          ui_textf("%d", state->gem_count);
+          ui_image_ratio(&test_image, 0.5, 0.5);
+        ol_Rect size = ui_row_end();
+      ui_end_measuremode();
+
+      ui_screen(ui_rel_x(1.0), 32);
+        ui_screen_anchor_xy(1.0, 0);
+        // Finally render it
+        ui_row(size.w, 32);
+          ui_textf("%d", state->gem_count);
+          ui_image_ratio(&test_image, 0.5, 0.5);
+        ui_row_end();
+      ui_screen_end();
+    ui_column_end();
+    ui_screen_anchor_xy(0.02, 0.02);
+    //ui_textf("FPS: %.0lf", round(1000/elapsed));
+  ui_screen_end();
+
+  build_draw(&state->build);
+
+  for (ui_Command *cmd = ui_command_next(); cmd != NULL; cmd = ui_command_next()) {
+    switch (cmd->kind) {
+      case Ui_Cmd_Text:
+        ol_draw_text(&test_font, cmd->data.text.text, cmd->rect.x, cmd->rect.y, vec4(1.0, 1.0, 1.0, 1.0));
+      break;
+      case Ui_Cmd_Frame:
+        ol_ninepatch(&ui_atlas, cmd->rect, (ol_NinePatch) { 
+          .inner = { 16, 16, 16, 16 },
+          .outer = { cmd->tag == 0 ? 0 : 48, 0, 48, 48 },
+        }, vec4(1.0, 0.2, 0.3, 1.0));
+      break;
+      case Ui_Cmd_Image:
+        ol_draw_tex_part(cmd->data.image.img, cmd->rect, cmd->data.image.part);
+      break;
+      default: {
+        assert(false);
+      }
+    }
+  }
+  ui_end_pass();
 
   sg_end_pass();
 
   int horizontal = 1;
-  for (int i = 0; i < 16; i++) {
+  for (int i = 0; i < 2; i++) {
     sg_begin_pass(state->blur.passes[horizontal], &(sg_pass_action) {
       .colors[0] = { .action = SG_ACTION_LOAD }
     });
@@ -675,7 +725,7 @@ static void frame(void) {
   sg_pass_action pass_action = {
     .colors[0] = { .action = SG_ACTION_CLEAR, .value = { 0.0f, 0.0f, 0.0f, 1.0f } }
   };
-  sg_begin_default_pass(&pass_action, (int)w, (int)h);
+  sg_begin_default_pass(&pass_action, sapp_width(), sapp_height());
   sg_apply_pipeline(state->fsq.pip);
   sg_apply_bindings(&(sg_bindings) {
     .vertex_buffers[0] = state->fsq.quad_vbuf,
@@ -704,6 +754,8 @@ static void event(const sapp_event *ev) {
         if (ev->key_code == SAPP_KEYCODE_ESCAPE)
           sapp_request_quit();
       #endif
+        if (ev->key_code == SAPP_KEYCODE_TAB)
+          build_toggle(&state->build);
     } break;
     case SAPP_EVENTTYPE_KEY_UP: {
         input_key_update(ev->key_code,0);
