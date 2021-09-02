@@ -106,6 +106,20 @@ void build_draw_3d(Mat4 vp) {
         .passive_rotate_axis = vec3_y,
       });
     }
+    else if (self.option_selected == 1 && self.semi_connected && self.second_pillar != NULL && self.first_pillar != NULL) {
+      Vec2 diff = sub2(self.second_pillar->pos, self.first_pillar->pos);
+      Vec2 pos = add2(self.first_pillar->pos, div2_f(diff, 2.0f));
+
+      sg_apply_pipeline(state->pip[Shader_ForceField]);
+      draw_ent(vp, &(Ent) {
+        .art = Art_Plane,
+        .pos = pos,
+        .transparency = lerp(0, 0.5, fmax(fmin(self.appear_anim, 1.0), 0.0)),
+        .angle = atan2f(diff.x, diff.y)+PI_f/2.0f,
+        .scale = { mag2(diff)/2.0f+0.4f, 4.0f, 1.0f },
+        .height = -1.0f,
+      });
+    }
   }
 }
 
@@ -133,7 +147,7 @@ void build_update() {
     self.first_pillar = NULL;
 
   if (pillar != NULL && self.option_selected == 1) {
-    if (self.semi_connected)
+    if (self.semi_connected && pillar != self.first_pillar)
       self.second_pillar = pillar;
     else 
       self.first_pillar = pillar;

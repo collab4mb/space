@@ -533,6 +533,7 @@ static void draw_ent_internal(Mat4 vp, Ent *ent) {
   if (mesh->shader == Shader_ForceField) {
     force_field_fs_params_t fs_params = {
       .stretch = { ent->scale.y, ent->scale.x },
+      .transparency = ent->transparency,
       .time = ent->time_since_last_collision,
     };
     sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_force_field_fs_params, &SG_RANGE(fs_params));
@@ -637,7 +638,6 @@ static void frame(void) {
     .colors[1] = { .action = SG_ACTION_CLEAR, .value = { 0.0f, 0.0f, 0.0f, 1.0f } }
   });
 
-  build_draw_3d(vp);
 
   for (Shader shd = 0; shd < Shader_COUNT; shd++) {
     sg_apply_pipeline(state->pip[shd]);
@@ -646,6 +646,7 @@ static void frame(void) {
         draw_ent(vp, ent);
   }
 
+  build_draw_3d(vp);
 
 
   ol_begin();

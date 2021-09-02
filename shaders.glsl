@@ -138,6 +138,7 @@ layout (location = 0) out vec4 frag_color;
 layout (location = 1) out vec4 bright_color;
 
 uniform force_field_fs_params {
+  float transparency;
   vec2 stretch;
   float time; /* set to zero when something hits force field */
 };
@@ -177,7 +178,7 @@ void main() {
 
   float d = (hex((uv + vec2(time, time)) * 3.0) + bang * 0.4);
   d *= center + icenter * 0.8;
-  frag_color = hole * scenter * vec4(1, 0, 1, 1) * d;
+  frag_color = hole * scenter * vec4(1, 0, 1, 1) * d * vec4(1.0, 1.0, 1.0, 0.0);
 }
 @end
 
