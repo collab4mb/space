@@ -126,8 +126,6 @@ void ui_init() {
     },
     .color_count = 2,
     .colors[0].blend = PREMULTIPLIED_BLEND,
-    .colors[0].pixel_format = SG_PIXELFORMAT_RGBA8,
-    .colors[1].pixel_format = SG_PIXELFORMAT_RGBA8,
   });
   _ui_state.healthbar.vbuf = sg_make_buffer(&(sg_buffer_desc) {
     .size = sizeof(_ui_state.healthbar.verts),

@@ -1,7 +1,6 @@
 #define SOKOL_IMPL
 #if defined(_MSC_VER)
-//#define SOKOL_D3D11
-#define SOKOL_GLCORE33
+#define SOKOL_D3D11
 #define SOKOL_LOG(str) OutputDebugStringA(str)
 #elif defined(__EMSCRIPTEN__)
 #define SOKOL_GLES2
@@ -481,8 +480,6 @@ void init(void) {
     },
     .color_count = 2,
     .colors[0].blend = PREMULTIPLIED_BLEND,
-    .colors[0].pixel_format = SG_PIXELFORMAT_RGBA8,
-    .colors[1].pixel_format = SG_PIXELFORMAT_RGBA8,
   }; 
 
   desc.shader = sg_make_shader(mesh_shader_desc(sg_query_backend()));
@@ -509,9 +506,7 @@ void init(void) {
     },
     .shader = sg_make_shader(fsq_shader_desc(sg_query_backend())),
     .primitive_type = SG_PRIMITIVETYPE_TRIANGLE_STRIP,
-    .label = "fullscreen quad pipeline",
-    .colors[0].pixel_format = SG_PIXELFORMAT_RGBA8,
-    .colors[1].pixel_format = SG_PIXELFORMAT_RGBA8,
+    .label = "fullscreen quad pipeline"
   });
 
   state->blur.pip = sg_make_pipeline(&(sg_pipeline_desc){
@@ -521,9 +516,7 @@ void init(void) {
     .shader = sg_make_shader(blur_shader_desc(sg_query_backend())),
     .primitive_type = SG_PRIMITIVETYPE_TRIANGLE_STRIP,
     .depth.pixel_format = SG_PIXELFORMAT_NONE,
-    .label = "blur pipeline",
-    .colors[0].pixel_format = SG_PIXELFORMAT_RGBA8,
-    .colors[1].pixel_format = SG_PIXELFORMAT_RGBA8,
+    .label = "blur pipeline"
   });
 
   resize_framebuffers();

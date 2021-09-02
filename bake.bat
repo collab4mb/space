@@ -3,8 +3,7 @@ pushd %~pd0
 mkdir build 2> nul
 
 :: Generate the shaders
-::sokol\shdc\win32\sokol-shdc.exe --input shaders.glsl --output build\shaders.glsl.h --slang hlsl5
-sokol\shdc\win32\sokol-shdc.exe --input shaders.glsl --output build\shaders.glsl.h --slang glsl330
+sokol\shdc\win32\sokol-shdc.exe --input shaders.glsl --output build\shaders.glsl.h --slang hlsl5
 
 :: Compile the game
 pushd build
