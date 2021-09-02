@@ -1,11 +1,44 @@
 #include <math.h>
+
+typedef enum {
+  _build_Option_Pillar,
+  _build_Option_Wall
+} _build_Option;
+
 typedef struct {
-  size_t option_selected;
+  Ent *begin;
+  Ent *end;
+  bool semi_connected;
+} _build_Connection;
+
+
+bool _build_connection_finalized(_build_Connection *connection) {
+  return connection->begin != NULL && connection->end != NULL;
+}
+
+void _build_connection_set_next(_build_Connection *connection, Ent *ent) {
+  if (connection->semi_connected) {
+    connection->end = ent;
+  }
+  else {
+    connection->begin = ent;
+  }
+}
+
+void _build_connection_select(_build_Connection *connection) {
+  if (connection->semi_connected && connection->end != NULL) {
+    *connection = (_build_Connection) { 0 };
+  }
+  else if (connection->begin != NULL) {
+    connection->semi_connected = true;
+  }
+}
+
+typedef struct {
+  _build_Option option_selected;
   float appear_anim;
   bool appearing;
-  Ent *first_pillar;
-  Ent *second_pillar;
-  bool semi_connected;
+  _build_Connection connection;
 } build_State;
 
 static build_State _build_state = { 0 };
@@ -56,7 +89,7 @@ bool build_event(const sapp_event *ev) {
         return true;
       }
       else if (self.appear_anim > 0.0f && ev->key_code == SAPP_KEYCODE_SPACE) {
-        if (self.option_selected == 0) {
+        if (self.option_selected == _build_Option_Pillar) {
           add_ent((Ent) {
             .art = Art_Pillar,
             .pos = add2(state->player->pos, mul2_f(vec2_swap(vec2_rot(state->player->angle)), 10.0)),
@@ -66,10 +99,10 @@ bool build_event(const sapp_event *ev) {
             .passive_rotate_axis = vec3_y,
           });
         }
-        else if (self.option_selected == 1) {
-          if (self.semi_connected && self.second_pillar != NULL) {
-            Vec2 diff = sub2(self.second_pillar->pos, self.first_pillar->pos);
-            Vec2 pos = add2(self.first_pillar->pos, div2_f(diff, 2.0f));
+        else if (self.option_selected == _build_Option_Wall) {
+          if (_build_connection_finalized(&self.connection)) {
+            Vec2 diff = sub2(self.connection.end->pos, self.connection.begin->pos);
+            Vec2 pos = add2(self.connection.begin->pos, div2_f(diff, 2.0f));
 
             add_ent((Ent) {
               .art = Art_Plane,
@@ -82,8 +115,9 @@ bool build_event(const sapp_event *ev) {
               .collider.weight = 1000.0f,
             });
           }
-          self.semi_connected = !self.semi_connected;
+          _build_connection_select(&self.connection);
         }
+      
         return true;
       }
     } break;
@@ -95,7 +129,7 @@ bool build_event(const sapp_event *ev) {
 static void draw_ent(Mat4 vp, Ent *ent);
 void build_draw_3d(Mat4 vp) {
   if (self.appearing || self.appear_anim > 0) {
-    if (self.option_selected == 0) {
+    if (self.option_selected == _build_Option_Pillar) {
       sg_apply_pipeline(state->pip[Shader_Standard]);
       draw_ent(vp, &(Ent) {
         .art = Art_Pillar,
@@ -106,9 +140,10 @@ void build_draw_3d(Mat4 vp) {
         .passive_rotate_axis = vec3_y,
       });
     }
-    else if (self.option_selected == 1 && self.semi_connected && self.second_pillar != NULL && self.first_pillar != NULL) {
-      Vec2 diff = sub2(self.second_pillar->pos, self.first_pillar->pos);
-      Vec2 pos = add2(self.first_pillar->pos, div2_f(diff, 2.0f));
+    else if (self.option_selected == _build_Option_Wall && _build_connection_finalized(&self.connection)) {
+      Vec2 diff = sub2(self.connection.end->pos, self.connection.begin->pos);
+      Vec2 pos = add2(self.connection.begin->pos, div2_f(diff, 2.0f));
+
 
       sg_apply_pipeline(state->pip[Shader_ForceField]);
       draw_ent(vp, &(Ent) {
@@ -129,8 +164,7 @@ void build_update() {
   for (Ent *ent = 0; (ent = ent_all_iter(ent));) {
     if (ent->art == Art_Pillar) {
       Ent *this_pillar = ent;
-      if (this_pillar != self.first_pillar)
-        this_pillar->bloom = 0.0;
+      this_pillar->bloom = 0.0;
       Vec2 diff = sub2(state->player->pos, this_pillar->pos);
       float dot = -dot2(vec2_swap(vec2_rot(state->player->angle)), norm2(diff));
       float dist = sqrtf(dot2(diff, diff));
@@ -141,18 +175,12 @@ void build_update() {
       }
     }
   }
-  if (self.semi_connected)
-    self.second_pillar = NULL;
-  else 
-    self.first_pillar = NULL;
-
-  if (pillar != NULL && self.option_selected == 1) {
-    if (self.semi_connected && pillar != self.first_pillar)
-      self.second_pillar = pillar;
-    else 
-      self.first_pillar = pillar;
-    pillar->bloom = fminf(fmaxf(self.appear_anim, 0.0f), 0.7f);
-  }
+  if (!_build_state.appearing) return;
+  _build_connection_set_next(&self.connection, pillar);
+  if (self.connection.begin)
+    self.connection.begin->bloom = 0.7f;
+  if (self.connection.end)
+    self.connection.end->bloom = 0.7f;
 }
 
 void build_draw() {
