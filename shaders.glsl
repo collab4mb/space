@@ -79,6 +79,7 @@ uniform vs_params {
 
 in vec3 position;
 in vec2 uv;
+in vec3 normal;
 
 out vec2 fs_uv;
 
@@ -120,6 +121,7 @@ uniform vs_params {
 
 in vec3 position;
 in vec2 uv;
+in vec3 normal;
 
 out vec2 fs_uv;
 

@@ -67,14 +67,18 @@ void ol_init() {
       .compare = SG_COMPAREFUNC_LESS_EQUAL,
     },
     .color_count = 2,
-    .colors[0].blend = (sg_blend_state){
-      .enabled = true,
-      .src_factor_rgb = SG_BLENDFACTOR_SRC_ALPHA,
-      .dst_factor_rgb = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
- //     .dst_factor_rgb = SG_,
-      .src_factor_alpha = SG_BLENDFACTOR_ONE,
-      .dst_factor_alpha = SG_BLENDFACTOR_ZERO
-    }
+    .colors[0] = {
+      .pixel_format = SG_PIXELFORMAT_RGBA8,
+      .blend = (sg_blend_state){
+        .enabled = true,
+        .src_factor_rgb = SG_BLENDFACTOR_SRC_ALPHA,
+        .dst_factor_rgb = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
+   //     .dst_factor_rgb = SG_,
+        .src_factor_alpha = SG_BLENDFACTOR_ONE,
+        .dst_factor_alpha = SG_BLENDFACTOR_ZERO
+      }
+    },
+    .colors[1].pixel_format = SG_PIXELFORMAT_RGBA8,
   });
 }
 
