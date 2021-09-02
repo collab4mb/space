@@ -216,16 +216,15 @@ static inline Ent *ent_all_iter(Ent *ent) {
   if (has_ent_prop(ent, EntProp_Active)) return ent;
   return NULL;
 }
+ol_Image test_image;
+ol_Image ui_atlas;
+ol_Image healthbar_image;
+ol_Font test_font;
 
 #include "build.h"
 #include "collision.h"
 #include "player.h"
 #include "ai.h"
-
-ol_Image test_image;
-ol_Image ui_atlas;
-ol_Image healthbar_image;
-ol_Font test_font;
 
 void load_texture(Art art, const char *texture) {
   cp_image_t player_png = cp_load_png(texture);
@@ -369,8 +368,8 @@ void init(void) {
     give_ent_prop(pillar, EntProp_PassiveRotate);
   }
 
-  #define ASTEROIDS_PER_RING (7)
-  #define ASTEROID_RINGS (3)
+  #define ASTEROIDS_PER_RING (0)
+  #define ASTEROID_RINGS (0)
   #define ASTEROID_RING_SPACING (20.0f)
   #define ASTEROID_FIRST_RING_START_DIST (12.0f)
   #define ASTEROID_DIST_RANDOMIZER (3.0f)
@@ -400,7 +399,7 @@ void init(void) {
   sg_setup(&(sg_desc){
     .context = sapp_sgcontext()
   });
-
+/*
   Ent *en = add_ent((Ent) {
     .art = Art_Ship,
     .pos = { -1, 12.5 },
@@ -417,6 +416,7 @@ void init(void) {
   });
   give_ent_prop(en,EntProp_HasAI);
   ai_init(en,AI_TYPE_DSHIP);
+  */
 
 
   load_mesh(    Art_Ship,   Shader_Standard,     "./Bob.obj", "./Bob_Orange.png");
@@ -649,6 +649,8 @@ static void frame(void) {
 
 
   ol_begin();
+  ui_setmousepos((int)_input_mouse_x, (int)_input_mouse_y);
+
   ui_screen((int)w, (int)h);
     ui_screen_anchor_xy(0.98, 0.02);
     ui_column(healthbar_image.width, 0);
@@ -685,12 +687,14 @@ static void frame(void) {
       case Ui_Cmd_Text:
         ol_draw_text(&test_font, cmd->data.text.text, cmd->rect.x, cmd->rect.y, vec4(1.0, 1.0, 1.0, 1.0));
       break;
-      case Ui_Cmd_Frame:
+      case Ui_Cmd_Frame: {
+        int tex_offs = cmd->tag == 1 ? 48 : 0;
+        Vec4 color = cmd->tag == 2 ? vec4(3.0, 0.8, 0.8, 1.0) : vec4(1.0, 0.2, 0.3, 0.9);
         ol_ninepatch(&ui_atlas, cmd->rect, (ol_NinePatch) { 
           .inner = { 16, 16, 16, 16 },
-          .outer = { cmd->tag == 0 ? 0 : 48, 0, 48, 48 },
-        }, vec4(1.0, 0.2, 0.3, 1.0));
-      break;
+          .outer = { tex_offs, 0, 48, 48 },
+        }, color);
+      } break;
       case Ui_Cmd_Image:
         ol_draw_tex_part(cmd->data.image.img, cmd->rect, cmd->data.image.part);
       break;
@@ -751,11 +755,15 @@ static void event(const sapp_event *ev) {
 
   switch (ev->type) {
     case SAPP_EVENTTYPE_KEY_DOWN: {
-        input_key_update(ev->key_code,1);
+      input_key_update(ev->key_code,1);
       #ifndef NDEBUG
         if (ev->key_code == SAPP_KEYCODE_ESCAPE)
           sapp_request_quit();
       #endif
+    } break;
+    case SAPP_EVENTTYPE_MOUSE_MOVE: {
+      _input_mouse_x = ev->mouse_x;
+      _input_mouse_y = ev->mouse_y;
     } break;
     case SAPP_EVENTTYPE_KEY_UP: {
         input_key_update(ev->key_code,0);

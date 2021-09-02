@@ -64,6 +64,7 @@ typedef struct {
   size_t command_iter;
   int margin;
   int offset_x, offset_y;
+  int mx, my;
 } ui_State;
 
 static ui_State _ui_state;
@@ -84,6 +85,11 @@ static ol_Rect* ui_cprect(ol_Rect rect) {
 
 static ol_Rect ui_mkrect(int x, int y, int w, int h) {
     return (ol_Rect) { .x = x, .y = y, .w = w, .h = h };
+}
+
+static void ui_setmousepos(int x, int y) {
+  _ui_state.mx = x;
+  _ui_state.my = y;
 }
 
 static ol_Rect ui_cut_top(ol_Rect *rect, int amount) {
@@ -312,6 +318,19 @@ static void ui_image(ol_Image *img) {
   });
 }
 
+static void ui_image_ex(ol_Image *img, ol_Rect part, int w, int h) {
+  ui_addcommand((ui_Command) {
+    .kind = Ui_Cmd_Image,
+    .rect = _ui_query_bounds(w, h),
+    .data = {
+      .image = { 
+        img,
+        part
+      } 
+    }
+  });
+}
+
 static void ui_image_ratio(ol_Image *img, float x, float y) {
   ui_addcommand((ui_Command) {
     .kind = Ui_Cmd_Image,
@@ -339,12 +358,16 @@ static void ui_image_part(ol_Image *img, ol_Rect part) {
   });
 }
 
-static void ui_frame(int width, int height, int tag) {
+static bool ui_frame(int width, int height, int tag) {
+  ol_Rect bounds = _ui_query_bounds(width, height); 
   ui_addcommand((ui_Command) {
     .kind = Ui_Cmd_Frame,
-    .rect = _ui_query_bounds(width, height),
+    .rect = bounds,
     .tag = tag,
   });
+  return 
+    _ui_state.mx >= bounds.x && _ui_state.mx <= (bounds.x+bounds.w) &&
+    _ui_state.my >= bounds.y && _ui_state.my <= (bounds.y+bounds.h);
 }
 
 static void ui_vtextf(const char *fmt, va_list vl) {

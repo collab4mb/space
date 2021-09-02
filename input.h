@@ -2,6 +2,8 @@ static uint8_t _input_new_key_state[SAPP_MAX_KEYCODES];
 static uint8_t _input_old_key_state[SAPP_MAX_KEYCODES];
 static uint8_t _input_new_mouse_state[SAPP_MAX_MOUSEBUTTONS];
 static uint8_t _input_old_mouse_state[SAPP_MAX_MOUSEBUTTONS];
+static float _input_mouse_x = 0;
+static float _input_mouse_y = 0;
 
 //Call at end of frame
 static void input_update() {
