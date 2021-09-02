@@ -3,8 +3,13 @@
 typedef enum {
   _build_Option_Pillar,
   _build_Option_Wall,
-  _build_Option_COUNT
+  _build_Option_COUNT,
 } _build_Option;
+
+typedef enum {
+  _build_Mode_Build = _build_Option_COUNT,
+  _build_Mode_COUNT,
+} _build_Mode;
 
 typedef struct {
   Ent *begin;
@@ -37,6 +42,8 @@ void _build_connection_select(_build_Connection *connection) {
 
 typedef struct {
   _build_Option option_selected;
+  _build_Mode mode_selected;
+  float distance;
   float appear_anim;
   bool appearing;
   _build_Connection connection;
@@ -53,11 +60,14 @@ typedef struct {
 const build_Option _build_options[] = {
   {"Pillar", "This is a pillar, press space to place a pillar", { 0, 48, 48, 48 } },
   {"Wall",   "This is a wall, you need to select 2 pillars to emerge a force field", { 48, 48, 48, 48 } },
+  // Top options
+  {"Build", "Leave build mode", { 48+48, 48, 48, 48 } },
 };
 
 #define self _build_state
 
 void build_enter() {
+  self.distance = 10;
   self.appear_anim = fmaxf(fminf(self.appear_anim, 1.0f), 0.0f);
   self.appearing = true;
 }
@@ -81,17 +91,16 @@ int _build_interp(int from, int to, float mul) {
   return (int)_build_easeinout((float)from, (float)to, fmaxf(fminf(self.appear_anim*mul, 1.0f), 0.0f));
 }
 
-bool _build_make_ent(Ent *ent, Shader *shader) {
+bool _build_make_ent(Ent *ent) {
   if (self.option_selected == _build_Option_Pillar) {
     *ent = (Ent) {
       .art = Art_Pillar,
-      .pos = add2(state->player->pos, mul2_f(vec2_swap(vec2_rot(state->player->angle)), 10.0)),
+      .pos = add2(state->player->pos, mul2_f(vec2_swap(vec2_rot(state->player->angle)), self.distance)),
       .height = 0,
       .x_rot = 0,
       .transparency = 1.0,
       .passive_rotate_axis = vec3_y,
     };
-    if (shader != NULL) *shader = Shader_Standard;
     return true;
   }
   else if (self.option_selected == _build_Option_Wall) {
@@ -109,7 +118,6 @@ bool _build_make_ent(Ent *ent, Shader *shader) {
         .collider.shape = Shape_Line,
         .collider.weight = 1000.0f,
       };
-      if (shader != NULL) *shader = Shader_ForceField;
       return true;
     }
   }
@@ -119,6 +127,9 @@ bool _build_make_ent(Ent *ent, Shader *shader) {
 static Ent* add_ent(Ent ent);
 bool build_event(const sapp_event *ev) {
   switch (ev->type) {
+    case SAPP_EVENTTYPE_MOUSE_SCROLL: {
+      self.distance += ev->scroll_y;
+    } break;
     case SAPP_EVENTTYPE_KEY_DOWN: {
       if (ev->key_code == SAPP_KEYCODE_TAB) {
         build_toggle();
@@ -126,7 +137,7 @@ bool build_event(const sapp_event *ev) {
       }
       else if (self.appear_anim > 0.0f && ev->key_code == SAPP_KEYCODE_SPACE) {
         Ent dest;
-        if (_build_make_ent(&dest, NULL)) {
+        if (_build_make_ent(&dest)) {
           add_ent(dest);
         }
         _build_connection_select(&self.connection);
@@ -141,15 +152,21 @@ bool build_event(const sapp_event *ev) {
 static void draw_ent(Mat4 vp, Ent *ent);
 void build_draw_3d(Mat4 vp) {
   Ent dest;
-  Shader shader;
-  if (_build_make_ent(&dest, &shader) && self.appearing) {
-    sg_apply_pipeline(state->pip[shader]);
+  if (_build_make_ent(&dest) && self.appearing) {
+    sg_apply_pipeline(state->pip[state->meshes[dest.art].shader]);
     dest.transparency = 0.5;
     draw_ent(vp, &dest);
   }
 }
 
 void build_update() {
+  if (input_key_down(SAPP_KEYCODE_LEFT_ALT)) {
+    self.distance += 0.5f;
+  }
+  if (input_key_down(SAPP_KEYCODE_LEFT_SHIFT)) {
+    self.distance -= 0.5f;
+  }
+  self.distance = fminf(fmaxf(self.distance, 0.0), 30.0);
   float weight = 0.0;
   Ent *pillar = NULL;
   for (Ent *ent = 0; (ent = ent_all_iter(ent));) {
@@ -175,9 +192,11 @@ void build_update() {
 }
 
 void build_draw() {
-  build_update();
+  // Main overlay
   ui_screen(sapp_width(), sapp_height());
+    // Main row
     ui_row(ui_rel_x(1.0), ui_rel_y(1.0));
+      // Interpolate position for animation
       ui_setoffset(_build_interp(-300, 0, 1.3f), 0);
       ui_screen(300, ui_rel_y(1.0));
         ui_frame(300, ui_rel_y(1.0), 1);
@@ -199,11 +218,20 @@ void build_draw() {
           }
         ui_row_end();
       ui_screen_end();
-      // A little margin from the top
-      for (int i = 0; i < 4; i += 1) {
+      self.mode_selected = 0;
+      for (size_t i = _build_Mode_Build; i < _build_Mode_COUNT; i += 1) {
         ui_setoffset(0, _build_interp(-60, 10, 3.0f-((float)i/4.0f)));
         ui_gap(10);
-        ui_frame(60, 60, 0);
+        ui_screen(60, 60);
+          if (ui_frame(60, 60, self.appearing ? 2 : 0)) {
+            if (input_mouse_down(0))
+              build_leave();
+            self.mode_selected = i;
+          }
+          ui_screen_anchor_xy(0.5, 0.5);
+          ui_margin(10);
+          ui_image_part(&ui_atlas, _build_options[i].part);
+        ui_screen_end();
       }
       ui_setoffset(0, 0);
     ui_row_end();
@@ -211,7 +239,10 @@ void build_draw() {
     ui_row(ui_rel_x(1.0), 32);
       ui_gap(300+10);
       ui_setoffset(0, _build_interp(50, 0, 1.6f));
-      ui_text(_build_options[self.option_selected].tooltip);
+      if (self.mode_selected)
+        ui_text(_build_options[self.mode_selected].tooltip);
+      else
+        ui_text(_build_options[self.option_selected].tooltip);
     ui_row_end();
   ui_screen_end();
   if (self.appearing)

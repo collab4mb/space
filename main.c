@@ -646,6 +646,7 @@ static void frame(void) {
         draw_ent(vp, ent);
   }
 
+  build_update();
   build_draw_3d(vp);
 
 
