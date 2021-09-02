@@ -29,8 +29,6 @@ static void collision_intersects(Ent *a, Ent *b, float *depth, Vec2 *normal) {
 static void collision(Ent *ac) {
   Collider *a_cl = &ac->collider;
 
-  ac->time_since_last_collision += 0.001f;
-
   if (ac->collider.size == 0.0f) return;
 
   Ent *ent = NULL;
@@ -46,9 +44,8 @@ static void collision(Ent *ac) {
     Vec2 normal = { 0 };
     collision_intersects(ac, ent, &depth, &normal);
     if (depth < 0.0f) {
-      /* if stops animation from freezing on first frame if you press against the shape */
-      ent->time_since_last_collision = 0.0f;
-      ac->time_since_last_collision = 0.0f;
+      ent->last_collision = state->tick;
+      ac->last_collision = state->tick;
 
       depth = sqrtf(m_abs(depth));
       float weight_sum = a_cl->weight + e_cl->weight;
@@ -67,7 +64,8 @@ static void collision(Ent *ac) {
   if (ent != NULL
       && has_ent_prop(ent, EntProp_Destructible)
       && has_ent_prop(ac,  EntProp_Projectile)) {
-    ent->health-=ac->damage;
+    ent->health -= ac->damage;
+    ent->last_hit = state->tick;
     if(has_ent_prop(ent,EntProp_HasAI))
       ai_damage(ent,&ac->parent);
 

@@ -23,7 +23,10 @@ const uint32_t positive_inf = 0x7F800000; // 0xFF << 23
 
 typedef struct { float x, y; } Vec2;
 typedef struct { float x, y, z; } Vec3;
-typedef struct { float x, y, z, w; } Vec4;
+typedef union {
+  struct { float x, y, z, w; };
+  float nums[4];
+} Vec4;
 typedef union {
     float nums[4][4];
     struct { Vec4 x, y, z, w; };
@@ -112,6 +115,7 @@ static Vec4 sign4(Vec4 a);
 
 //Matrix
 static Mat4 mul4x4(Mat4 a, Mat4 b);
+static Vec4 mul4x44(Mat4 a, Vec4 b);
 static Mat4 scale4x4(Vec3 v);
 static Mat4 ident4x4();
 static Mat4 transpose4x4(Mat4 a);
@@ -418,6 +422,18 @@ static Mat4 mul4x4(Mat4 a, Mat4 b) {
         out.nums[c][r] += a.nums[k][r] * b.nums[c][k];
     }
   return out;
+}
+
+static Vec4 mul4x44(Mat4 m, Vec4 v) {
+  Vec4 res;
+  for(int x = 0; x < 4; ++x) {
+    float sum = 0;
+    for(int y = 0; y < 4; ++y)
+      sum += m.nums[y][x] * v.nums[y];
+
+    res.nums[x] = sum;
+  }
+  return res;
 }
 
 static Mat4 scale4x4(Vec3 v) {

@@ -26,6 +26,17 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
+#define PREMULTIPLIED_BLEND ((sg_blend_state) {          \
+  .enabled = true,                                       \
+  .src_factor_rgb = SG_BLENDFACTOR_ONE,                  \
+  .dst_factor_rgb = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,  \
+  .src_factor_alpha = SG_BLENDFACTOR_ONE,                \
+  .dst_factor_alpha = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,\
+})
+
+/* corresponds to 16ms of elapsed frame time */
+typedef uint64_t Tick;
+
 #include <math.h>
 #include "math.h"
 #include "fio.h"
@@ -92,10 +103,10 @@ typedef struct {
   const AI_state *state;
   GenDex target;
   uint64_t tick_end;
-}AI;
+} AI;
 
 /* A game entity. Usually, it is rendered somewhere and has some sort of dynamic behavior */
-struct Ent{
+struct Ent {
   /* packed into 64 bit sections for alignment */
   uint64_t props[(EntProp_COUNT + 63) / 64];
 
@@ -108,17 +119,18 @@ struct Ent{
   float angle;
 
   /* used for animations */
-  float time_since_last_collision;
+  Tick last_collision;
 
   /* tied to EntProp_PassiveRotate */
   Vec3 passive_rotate_axis;
   float passive_rotate_angle;
 
   /* tied to EntProp_PickUp */
-  uint64_t pick_up_after_tick;
+  Tick pick_up_after_tick;
 
   /* tied to EntProp_Destructible */
-  int32_t health;
+  int32_t health, max_hp;
+  Tick last_hit;
 
   int32_t damage;
 
@@ -166,11 +178,6 @@ typedef struct {
   size_t index_count;
 } Mesh;
 
-#define MAX_HEALTHBARS (1 << 4)
-typedef struct {
-  Vec2 pos, uv;
-} HealthbarVert;
-
 #define OFFSCREEN_SAMPLE_COUNT (4)
 #define STATE_MAX_ENTS (1 << 12)
 #define BLUR_PASSES (4)
@@ -181,14 +188,9 @@ typedef struct {
   GenDex player;
   float player_turn_accel;
   size_t gem_count;
-  uint64_t frame, tick;
+  uint64_t frame; /* a sokol_time tick, not one of our game ticks */
+  Tick tick;
   double fixed_tick_accumulator;
-  struct {
-    sg_buffer vbuf, ibuf;
-    HealthbarVert verts[MAX_HEALTHBARS * 4];
-    uint16_t      indxs[MAX_HEALTHBARS * 6];
-    sg_pipeline pip;
-  } healthbar;
   struct {
     sg_image color_img, bright_img, depth_img;
     sg_pass pass;
@@ -248,10 +250,7 @@ static inline Ent *ent_all_iter(Ent *ent) {
 #include "player.h"
 #include "ai.h"
 
-ol_Image test_image;
-ol_Image ui_atlas;
-ol_Image healthbar_image;
-ol_Font test_font;
+ol_Image gem_image;
 
 void load_texture(Art art, const char *texture) {
   cp_image_t player_png = cp_load_png(texture);
@@ -378,6 +377,7 @@ void init(void) {
     .collider.size = 2.0f,
     .collider.weight = 0.4f,
     .health = 10,
+    .max_hp = 10,
     .damage = 1,
   });
   state->player = get_gendex(player);
@@ -416,6 +416,7 @@ void init(void) {
         .collider.weight = 1.0f,
         .passive_rotate_axis = rand3(),
         .health = 1,
+        .max_hp = 1,
       });
       give_ent_prop(ast, EntProp_PassiveRotate);
       give_ent_prop(ast, EntProp_Destructible);
@@ -431,7 +432,8 @@ void init(void) {
     .pos = { -1, 12.5 },
     .collider.size = 2.0f,
     .collider.weight = 0.4f,
-    .health = 2,
+    .health = 3,
+    .max_hp = 3,
     .damage = 1,
   });
   give_ent_prop(en,EntProp_HasAI);
@@ -442,7 +444,8 @@ void init(void) {
     .pos = { -10, 12.5 },
     .collider.size = 2.0f,
     .collider.weight = 0.4f,
-    .health = 2,
+    .health = 3,
+    .max_hp = 3,
     .damage = 1,
   });
   give_ent_prop(en,EntProp_HasAI);
@@ -456,11 +459,7 @@ void init(void) {
   load_mesh(   Art_Laser,      Shader_Laser,   "./LASER.obj",    "./Mineral.png");
   load_mesh( Art_Mineral,   Shader_Standard, "./Mineral.obj",    "./Mineral.png");
 
-  ui_atlas = ol_load_image("./ui.png");
-  test_font = ol_load_font("./Orbitron-Regular.ttf");
-  ui_init(&test_font);
-
-
+  ui_init();
   ol_init();
 
   /* a pipeline state object */
@@ -480,13 +479,7 @@ void init(void) {
       .compare = SG_COMPAREFUNC_LESS_EQUAL,
     },
     .color_count = 2,
-    .colors[0].blend = (sg_blend_state) {
-      .enabled = true,
-      .src_factor_rgb = SG_BLENDFACTOR_ONE, 
-      .dst_factor_rgb = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA, 
-      .src_factor_alpha = SG_BLENDFACTOR_ONE, 
-      .dst_factor_alpha = SG_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
-    },
+    .colors[0].blend = PREMULTIPLIED_BLEND,
   }; 
 
   desc.shader = sg_make_shader(mesh_shader_desc(sg_query_backend()));
@@ -498,28 +491,7 @@ void init(void) {
   desc.shader = sg_make_shader(force_field_shader_desc(sg_query_backend()));
   state->pip[Shader_ForceField] = sg_make_pipeline(&desc);
 
-  {
-    sg_pipeline_desc hp_desc = desc;
-    hp_desc.shader = sg_make_shader(healthbar_shader_desc(sg_query_backend()));
-    hp_desc.layout = (sg_layout_desc) {
-      .attrs[ATTR_healthbar_vs_pos].format = SG_VERTEXFORMAT_FLOAT2,
-      .attrs[ATTR_healthbar_vs_uv].format  = SG_VERTEXFORMAT_FLOAT2,
-    };
-    hp_desc.primitive_type = SG_PRIMITIVETYPE_TRIANGLE_STRIP;
-    state->healthbar.pip = sg_make_pipeline(&hp_desc);
-    state->healthbar.vbuf = sg_make_buffer(&(sg_buffer_desc) {
-      .size = sizeof(state->healthbar.verts),
-      .usage = SG_USAGE_STREAM,
-    });
-    state->healthbar.ibuf = sg_make_buffer(&(sg_buffer_desc) {
-      .size = sizeof(state->healthbar.indxs),
-      .usage = SG_USAGE_STREAM,
-      .type = SG_BUFFERTYPE_INDEXBUFFER,
-    });
-  }
-
-  test_image = ol_load_image("./Gem.png");
-  healthbar_image = ol_load_image("./healthbar.png");
+  gem_image = ol_load_image("./Gem.png");
 
   /* a vertex buffer to render a fullscreen rectangle */
   state->fsq.quad_vbuf = sg_make_buffer(&(sg_buffer_desc){
@@ -550,9 +522,12 @@ void init(void) {
   resize_framebuffers();
 }
 
-/* naively renders with n draw calls per entity
- * TODO: optimize for fewer draw calls */
-static void draw_ent(Mat4 vp, Ent *ent) {
+static float ent_health_frac(Ent *ent) {
+  float t = (state->tick - ent->last_hit) / 30.0f;
+  return lerp(ent->health+1, ent->health, fminf(1, t)) / fmaxf(ent->max_hp, 1);
+}
+
+static Mat4 ent_model_mat(Ent *ent) {
   Mat4 m = translate4x4(vec3(ent->pos.x, ent->height, ent->pos.y));
 
   m = mul4x4(m, y_rotate4x4(ent->angle));
@@ -565,6 +540,14 @@ static void draw_ent(Mat4 vp, Ent *ent) {
   Vec3 scale = (magmag3(ent->scale) == 0.0f) ? vec3_f(1.0f) : ent->scale;
   if (ent->art == Art_Ship) scale = mul3_f(scale, 0.3f);
   m = mul4x4(m, scale4x4(scale));
+
+  return m;
+}
+
+/* naively renders with n draw calls per entity
+ * TODO: optimize for fewer draw calls */
+static void draw_ent(Mat4 vp, Ent *ent) {
+  Mat4 m = ent_model_mat(ent);
 
   Mesh *mesh = state->meshes + ent->art;
 
@@ -581,7 +564,7 @@ static void draw_ent(Mat4 vp, Ent *ent) {
   if (mesh->shader == Shader_ForceField) {
     force_field_fs_params_t fs_params = {
       .stretch = { ent->scale.y, ent->scale.x },
-      .time = ent->time_since_last_collision,
+      .time = (state->tick - ent->last_collision) / 600.0f,
     };
     sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_force_field_fs_params, &SG_RANGE(fs_params));
   } else if (mesh->shader == Shader_Standard) {
@@ -590,7 +573,6 @@ static void draw_ent(Mat4 vp, Ent *ent) {
   }
   vs_params_t vs_params = { .view_proj = vp, .model = m };
   sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_vs_params, &SG_RANGE(vs_params));
-
 
   sg_draw(0, mesh->index_count, 1);
 }
@@ -684,40 +666,22 @@ static void frame(void) {
       if (state->meshes[ent->art].shader == shd)
         draw_ent(vp, ent);
   }
-  sg_apply_pipeline(state->healthbar.pip);
-  state->healthbar.verts[0] = (HealthbarVert) { 0.0f, 0.0f,  0.0f, 0.0f };
-  state->healthbar.verts[1] = (HealthbarVert) { 1.0f, 0.0f,  1.0f, 0.0f };
-  state->healthbar.verts[2] = (HealthbarVert) { 1.0f, 1.0f,  1.0f, 1.0f };
-  state->healthbar.verts[3] = (HealthbarVert) { 0.0f, 1.0f,  0.0f, 1.0f };
-  memcpy(state->healthbar.indxs, &((uint16_t[]) { 0, 1, 2, 0, 3, 2 }), sizeof(uint16_t) * 6);
-  sg_update_buffer(state->healthbar.vbuf, &(sg_range) {
-    .ptr = state->healthbar.verts, 
-    .size = sizeof(HealthbarVert) * 4,
-  });
-  sg_update_buffer(state->healthbar.ibuf, &(sg_range) {
-    .ptr = state->healthbar.indxs, 
-    .size = sizeof(uint16_t) * 6,
-  });
-  sg_apply_bindings(&(sg_bindings) {
-    .vertex_buffers[0] = state->healthbar.vbuf,
-    .index_buffer = state->healthbar.ibuf,
-  });
-  sg_draw(0, 6, 1);
+
+  float plr_hp = 0.0;
+  Ent *plr = try_gendex(state->player);
+  if (plr) plr_hp = ent_health_frac(plr);
 
   ol_begin();
   ui_screen((int)w, (int)h);
     ui_screen_anchor_xy(0.98, 0.02);
-    ui_column(healthbar_image.width, 0);
-      ui_screen(0, healthbar_image.height/2);
-        ui_image_part(&healthbar_image, (ol_Rect) { 0, 0, healthbar_image.width, healthbar_image.height/2 });
-        ui_image_part(&healthbar_image, (ol_Rect) { 0, healthbar_image.height/2, healthbar_image.width/1.5, healthbar_image.height/2 });
-      ui_screen_end();
+    ui_column(250, 0);
+      ui_healthbar(250, 50, plr_hp, ui_HealthbarShape_Fancy);
 
       // Measure out the row
       ui_measuremode();
         ui_row(0, 0);
           ui_textf("%d", state->gem_count);
-          ui_image_ratio(&test_image, 0.5, 0.5);
+          ui_image_ratio(&gem_image, 0.5, 0.5);
         ol_Rect size = ui_row_end();
       ui_end_measuremode();
 
@@ -726,7 +690,7 @@ static void frame(void) {
         // Finally render it
         ui_row(size.w, 32);
           ui_textf("%d", state->gem_count);
-          ui_image_ratio(&test_image, 0.5, 0.5);
+          ui_image_ratio(&gem_image, 0.5, 0.5);
         ui_row_end();
       ui_screen_end();
     ui_column_end();
@@ -736,25 +700,21 @@ static void frame(void) {
 
   build_draw(&state->build);
 
-  for (ui_Command *cmd = ui_command_next(); cmd != NULL; cmd = ui_command_next()) {
-    switch (cmd->kind) {
-      case Ui_Cmd_Text:
-        ol_draw_text(&test_font, cmd->data.text.text, cmd->rect.x, cmd->rect.y, vec4(1.0, 1.0, 1.0, 1.0));
-      break;
-      case Ui_Cmd_Frame:
-        ol_ninepatch(&ui_atlas, cmd->rect, (ol_NinePatch) { 
-          .inner = { 16, 16, 16, 16 },
-          .outer = { cmd->tag == 0 ? 0 : 48, 0, 48, 48 },
-        }, vec4(1.0, 0.2, 0.3, 1.0));
-      break;
-      case Ui_Cmd_Image:
-        ol_draw_tex_part(cmd->data.image.img, cmd->rect, cmd->data.image.part);
-      break;
-      default: {
-        assert(false);
-      }
+  ui_render();
+  for (Ent *ent = 0; (ent = ent_all_iter(ent));)
+    if (has_ent_prop(ent,EntProp_HasAI) && ent->health < ent->max_hp) {
+      Vec4 v = mul4x44(mul4x4(vp, ent_model_mat(ent)), vec4(0, -4, 0, 1));
+      v = div4_f(v, v.w);
+      v.x = (v.x + 1.0f)/2.0f * sapp_widthf();
+      v.y = (v.y + 1.0f)/2.0f * sapp_heightf();
+      v.y = sapp_heightf() - v.y;
+      ui_render_healthbar((ol_Rect) {
+        .x = roundf(v.x) - 70/2,
+        .y = roundf(v.y) - 14/2,
+        .w = 70,
+        .h = 14,
+      }, ent_health_frac(ent), ui_HealthbarShape_Minimal);
     }
-  }
   ui_end_pass();
 
   sg_end_pass();
