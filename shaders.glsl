@@ -50,6 +50,7 @@ void main() {
 uniform sampler2D tex;
 uniform mesh_fs_params {
   float bloom;
+  float transparency;
 };
 
 in vec3 light;
@@ -60,7 +61,7 @@ layout (location = 1) out vec4 bright_color;
 
 void main() {
   vec3 object_color = vec3(texture(tex, fs_uv));
-  frag_color = vec4(object_color * light, 1);
+  frag_color = vec4(object_color * light, 1) * transparency;
 
   float brightness = dot(frag_color.rgb, vec3(0.2126, 0.7152, 0.0722));
   bright_color = vec4(step(brightness, bloom) * frag_color.rgb, 1);
@@ -90,6 +91,10 @@ void main() {
 
 @fs laser_fs
 uniform sampler2D tex;
+uniform mesh_fs_params {
+  float bloom;
+  float transparency;
+};
 
 in vec2 fs_uv;
 
@@ -133,6 +138,7 @@ layout (location = 0) out vec4 frag_color;
 layout (location = 1) out vec4 bright_color;
 
 uniform force_field_fs_params {
+  float transparency;
   vec2 stretch;
   float time; /* set to zero when something hits force field */
 };
@@ -147,7 +153,21 @@ void main() {
   vec2 uv = fs_uv;
   float center = 1.0 - 2.0*abs(uv.x - 0.5);
   center = smoothstep(0.0, 1.0, center);
+
+  vec2 muv = vec2(abs(uv.x * 2.0 - 1.0), uv.y);
+  float hole = min(1, length(muv - vec2(0.75, 0.5)) / 0.7);
+  hole = 1.0 - smoothstep(1.0, 0.1, hole);
+
   uv *= stretch;
+
+  /* fade on last 0.2 units of vertical sides */
+  float hastretchy = stretch.y / 2.0;
+  float scenter = abs(uv.y - hastretchy) - hastretchy + 0.3;
+  scenter = min(1.0, 1.0 - (scenter / 0.3));
+
+  /* fade on last 0.2 units of vertical sides */
+  float icenter = abs(0.2 - max(0, abs(uv.y - hastretchy) - hastretchy + 0.6));
+  icenter = 1.0 - min(1.0, (icenter / 0.2));
 
   float ttime = time * 3.6;
   float pt = fs_uv.x + sin(fs_uv.y*80.0)*(ttime+0.1)*0.1;
@@ -156,8 +176,9 @@ void main() {
   uv.x += bang * 0.1;
   uv.y += sin(bang + uv.x) * 0.1;
 
-  float d = (hex(uv * 2.0) + bang * 0.4) * center;
-  frag_color = vec4(1, 0, 1, 1) * d * 0.7;
+  float d = (hex((uv + vec2(time, time)) * 3.0) + bang * 0.4);
+  d *= center + icenter * 0.8;
+  frag_color = hole * scenter * vec4(1, 0, 1, 1) * d * vec4(1.0, 1.0, 1.0, 0.0);
 
   float brightness = dot(frag_color.rgb, vec3(0.2126, 0.7152, 0.0722));
   bright_color = vec4(step(brightness, 0.04) * frag_color.rgb, 1);

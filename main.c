@@ -55,7 +55,6 @@ typedef struct GenDex GenDex;
 //The list of enums/states will be getting bigger as we add more entities,
 //so move it to its own file
 #include "ai_type.h"
-#include "build.h"
 
 /* EntProps enable codepaths for game entities.
    These aren't boolean fields because that makes it more difficult to deal with
@@ -85,7 +84,7 @@ typedef enum {
   EntProp_COUNT,
 } EntProp;
 
-typedef enum { Art_Ship, Art_Asteroid, Art_Plane, Art_Laser, Art_Mineral, Art_COUNT } Art;
+typedef enum { Art_Ship, Art_Asteroid, Art_Plane, Art_Pillar, Art_Laser, Art_Mineral, Art_COUNT } Art;
 
 typedef enum { Shape_Circle, Shape_Line } Shape;
 typedef struct {
@@ -117,13 +116,13 @@ struct Ent {
   Vec3 scale;
 
   float angle;
+  float x_rot;
 
   /* used for animations */
   Tick last_collision;
 
   /* tied to EntProp_PassiveRotate */
   Vec3 passive_rotate_axis;
-  float passive_rotate_angle;
 
   /* tied to EntProp_PickUp */
   Tick pick_up_after_tick;
@@ -138,7 +137,7 @@ struct Ent {
   GenDex parent;
 
   Art art;
-  float bloom;
+  float bloom, transparency;
 
   Collider collider;
   AI ai;
@@ -204,7 +203,6 @@ typedef struct {
     sg_pass passes[BLUR_PASSES][2];
     sg_pipeline pip;
   } blur;
-  build_State build;
 } State;
 static State *state;
 
@@ -246,18 +244,37 @@ static inline Ent *ent_all_iter(Ent *ent) {
   return NULL;
 }
 
+static void fire_laser(Ent *ent) {
+  Vec2 e_dir = vec2_swap(vec2_rot(ent->angle));
+  Ent *e = add_ent((Ent) {
+    .art = Art_Laser,
+    .bloom = 1.0,
+    .pos = add2(ent->pos, mul2_f(e_dir, 2.5f)),
+    .vel = add2(ent->vel, mul2_f(e_dir, 0.8f)),
+    .scale = vec3(1.0f, 1.0f, 3.0f),
+    .angle = ent->angle,
+    .height = -0.8,
+    .collider.size = 0.2f,
+    .collider.weight = 1.0f,
+    .damage = ent->damage,
+    .parent = get_gendex(ent),
+  });
+  give_ent_prop(e, EntProp_Projectile);
+}
+
+ol_Image gem_image;
+
+#include "build.h"
 #include "collision.h"
 #include "player.h"
 #include "ai.h"
-
-ol_Image gem_image;
 
 void load_texture(Art art, const char *texture) {
   cp_image_t player_png = cp_load_png(texture);
   cp_flip_image_horizontal(&player_png);
   int w = player_png.w;
   int h = player_png.h;
-  if (art == Art_Ship)
+  if (art == Art_Ship || art == Art_Pillar)
     state->meshes[art].texture = sg_make_image_with_mipmaps(&(sg_image_desc){
       .width = w,
       .height = h,
@@ -386,12 +403,23 @@ void init(void) {
   add_ent((Ent) {
     .art = Art_Plane,
     .pos = { -1.5, 6.5 },
-    .scale = { 5.0f, 3.0f, 1.0f },
+    .scale = { 5.0f, 4.0f, 1.0f },
     .height = -1.0f,
-    .collider.size = 9.0f,
+    .collider.size = 10.0f,
     .collider.shape = Shape_Line,
     .collider.weight = 1000.0f,
   });
+
+  for (int i = -1; i < 2; i += 2) {
+    Ent *pillar = add_ent((Ent) {
+      .art = Art_Pillar,
+      .pos = { -1.5 + i * 4.2, 6.5 },
+      .height = 0.0,
+      .x_rot = 0,
+      .passive_rotate_axis = vec3_y,
+    });
+    give_ent_prop(pillar, EntProp_PassiveRotate);
+  }
 
   #define ASTEROIDS_PER_RING (7)
   #define ASTEROID_RINGS (3)
@@ -426,7 +454,6 @@ void init(void) {
   sg_setup(&(sg_desc){
     .context = sapp_sgcontext()
   });
-
   Ent *en = add_ent((Ent) {
     .art = Art_Ship,
     .pos = { -1, 12.5 },
@@ -458,6 +485,7 @@ void init(void) {
   load_mesh(   Art_Plane, Shader_ForceField,   "./Plane.obj",               NULL);
   load_mesh(   Art_Laser,      Shader_Laser,   "./LASER.obj",    "./Mineral.png");
   load_mesh( Art_Mineral,   Shader_Standard, "./Mineral.obj",    "./Mineral.png");
+  load_mesh(  Art_Pillar,   Shader_Standard,  "./Pillar.obj",     "./Pillar.png");
 
   ui_init();
   ol_init();
@@ -531,11 +559,13 @@ static Mat4 ent_model_mat(Ent *ent) {
   Mat4 m = translate4x4(vec3(ent->pos.x, ent->height, ent->pos.y));
 
   m = mul4x4(m, y_rotate4x4(ent->angle));
+  if (ent->x_rot != 0.0f)
+    m = mul4x4(m, x_rotate4x4(ent->x_rot));
   if (ent == try_gendex(state->player))
     m = mul4x4(m, z_rotate4x4(state->player_turn_accel*-2.0f));
   if (has_ent_prop(ent, EntProp_PassiveRotate))
     m = mul4x4(m, rotate4x4(ent->passive_rotate_axis,
-                            ent->passive_rotate_angle += 0.01f));
+                            (float)state->tick/70.0f));
 
   Vec3 scale = (magmag3(ent->scale) == 0.0f) ? vec3_f(1.0f) : ent->scale;
   if (ent->art == Art_Ship) scale = mul3_f(scale, 0.3f);
@@ -546,7 +576,7 @@ static Mat4 ent_model_mat(Ent *ent) {
 
 /* naively renders with n draw calls per entity
  * TODO: optimize for fewer draw calls */
-static void draw_ent(Mat4 vp, Ent *ent) {
+static void draw_ent_internal(Mat4 vp, Ent *ent) {
   Mat4 m = ent_model_mat(ent);
 
   Mesh *mesh = state->meshes + ent->art;
@@ -568,13 +598,30 @@ static void draw_ent(Mat4 vp, Ent *ent) {
     };
     sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_force_field_fs_params, &SG_RANGE(fs_params));
   } else if (mesh->shader == Shader_Standard) {
-    mesh_fs_params_t fs_params = { .bloom = ent->bloom };
+    mesh_fs_params_t fs_params = {
+      .bloom = ent->bloom,
+      .transparency = (ent->transparency == 0.0f) ? 1.0f : ent->transparency,
+    };
     sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_mesh_fs_params, &SG_RANGE(fs_params));
   }
   vs_params_t vs_params = { .view_proj = vp, .model = m };
   sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_vs_params, &SG_RANGE(vs_params));
 
   sg_draw(0, mesh->index_count, 1);
+}
+
+static void draw_ent(Mat4 vp, Ent *ent) {
+  if (ent->art == Art_Pillar) {
+    Ent copy = *ent;
+    copy.height = 2;
+    draw_ent_internal(vp, &copy);
+    copy.x_rot = PI_f;
+    copy.height = -4;
+    copy.angle = -copy.angle;
+    draw_ent_internal(vp, &copy);
+  }
+  else
+    draw_ent_internal(vp, ent);
 }
 
 static void tick(void) {
@@ -660,6 +707,7 @@ static void frame(void) {
     .colors[1] = { .action = SG_ACTION_CLEAR, .value = { 0.0f, 0.0f, 0.0f, 1.0f } }
   });
 
+
   for (Shader shd = 0; shd < Shader_COUNT; shd++) {
     sg_apply_pipeline(state->pip[shd]);
     for (Ent *ent = 0; (ent = ent_all_iter(ent));)
@@ -667,11 +715,17 @@ static void frame(void) {
         draw_ent(vp, ent);
   }
 
+
   float plr_hp = 0.0;
   Ent *plr = try_gendex(state->player);
   if (plr) plr_hp = ent_health_frac(plr);
 
+  build_update();
+  build_draw_3d(vp);
+
   ol_begin();
+  ui_setmousepos((int)_input_mouse_x, (int)_input_mouse_y);
+
   ui_screen((int)w, (int)h);
     ui_screen_anchor_xy(0.98, 0.02);
     ui_column(250, 0);
@@ -695,10 +749,10 @@ static void frame(void) {
       ui_screen_end();
     ui_column_end();
     ui_screen_anchor_xy(0.02, 0.02);
-    //ui_textf("FPS: %.0lf", round(1000/elapsed));
+    ui_textf("FPS: %.0lf", round(1000/elapsed));
   ui_screen_end();
 
-  build_draw(&state->build);
+  build_draw();
 
   ui_render();
   for (Ent *ent = 0; (ent = ent_all_iter(ent));)
@@ -765,15 +819,19 @@ static void cleanup(void) {
 }
 
 static void event(const sapp_event *ev) {
+  if (build_event(ev)) return;
+
   switch (ev->type) {
     case SAPP_EVENTTYPE_KEY_DOWN: {
-        input_key_update(ev->key_code,1);
+      input_key_update(ev->key_code,1);
       #ifndef NDEBUG
         if (ev->key_code == SAPP_KEYCODE_ESCAPE)
           sapp_request_quit();
       #endif
-        if (ev->key_code == SAPP_KEYCODE_TAB)
-          build_toggle(&state->build);
+    } break;
+    case SAPP_EVENTTYPE_MOUSE_MOVE: {
+      _input_mouse_x = ev->mouse_x;
+      _input_mouse_y = ev->mouse_y;
     } break;
     case SAPP_EVENTTYPE_KEY_UP: {
         input_key_update(ev->key_code,0);

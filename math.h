@@ -15,6 +15,8 @@
 #define vec3_y ((Vec3) { 0.0f, 1.0f, 0.0f })
 #define vec3_z ((Vec3) { 0.0f, 0.0f, 1.0f })
 
+#define vec4_f(f) ((Vec4) { f, f, f, f })
+
 #define sat_i8(x) (int8_t) (m_clamp((x), -128, 127))
 
 #define PI_f (3.14159265359f)
@@ -121,6 +123,7 @@ static Mat4 ident4x4();
 static Mat4 transpose4x4(Mat4 a);
 static Mat4 translate4x4(Vec3 pos);
 static Mat4 rotate4x4(Vec3 axis, float angle);
+static Mat4 x_rotate4x4(float angle);
 static Mat4 y_rotate4x4(float angle);
 static Mat4 z_rotate4x4(float angle);
 static Mat4 perspective4x4(float fov, float aspect, float n, float f);
@@ -486,14 +489,25 @@ static Mat4 rotate4x4(Vec3 axis, float angle) {
   return res;
 }
 
+static Mat4 x_rotate4x4(float angle) {
+  float c = cosf(angle);
+  float s = sinf(angle);
+  return (Mat4) {{
+    1.0f, 0.0f, 0.0f, 0.0f,
+    0.0f,    c,    s, 0.0f,
+    0.0f,   -s,    c, 0.0f,
+    0.0f, 0.0f, 0.0f, 1.0f,
+  }};
+}
+
 static Mat4 y_rotate4x4(float angle) {
   float c = cosf(angle);
   float s = sinf(angle);
   return (Mat4) {{
-         c, 0.0f,   -s, 0.0f,
-      0.0f, 1.0f, 0.0f, 0.0f,
-         s, 0.0f,    c, 0.0f,
-      0.0f, 0.0f, 0.0f, 1.0f
+       c, 0.0f,   -s, 0.0f,
+    0.0f, 1.0f, 0.0f, 0.0f,
+       s, 0.0f,    c, 0.0f,
+    0.0f, 0.0f, 0.0f, 1.0f
   }};
 }
 
@@ -501,10 +515,10 @@ static Mat4 z_rotate4x4(float angle) {
   float c = cosf(angle);
   float s = sinf(angle);
   return (Mat4) {{
-         c,    s, 0.0f, 0.0f,
-        -s,    c, 0.0f, 0.0f,
-      0.0f, 0.0f, 1.0f, 0.0f,
-      0.0f, 0.0f, 0.0f, 1.0f
+       c,    s, 0.0f, 0.0f,
+      -s,    c, 0.0f, 0.0f,
+    0.0f, 0.0f, 1.0f, 0.0f,
+    0.0f, 0.0f, 0.0f, 1.0f
   }};
 }
 

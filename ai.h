@@ -66,20 +66,7 @@ static AI_statenum _ai_attack(Ent *ent) {
   if(target==NULL)
     return AI_STATE_IDLE;
 
-  //Shoot
-  Vec2 e_dir = vec2_swap(vec2_rot(ent->angle));
-  Ent *e = add_ent((Ent) {
-    .art = Art_Asteroid,
-    .pos = add2(ent->pos,mul2_f(e_dir,2.5f)),
-    .vel = add2(ent->vel,mul2_f(e_dir,0.6f)),
-    .scale = vec3_f(0.2f),
-    .height = -0.8,
-    .collider.size = 0.2f,
-    .collider.weight = 1.0f,
-    .damage = ent->damage,
-    .parent = get_gendex(ent),
-  });
-  give_ent_prop(e, EntProp_Projectile);
+  fire_laser(ent);
 
   return AI_STATE_NULL;
 }

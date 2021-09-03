@@ -12,22 +12,8 @@ static void player_update(Ent *player) {
   state->player_turn_accel *= 0.8;
   Vec2 p_dir = vec2_swap(vec2_rot(player->angle));
 
-  if (input_key_pressed(SAPP_KEYCODE_SPACE)) {
-    Ent *e = add_ent((Ent) {
-      .art = Art_Laser,
-      .bloom = 1.0,
-      .pos = add2(player->pos,mul2_f(p_dir,2.5f)),
-      .vel = add2(player->vel,mul2_f(p_dir,0.8f)),
-      .scale = vec3(1.0f, 1.0f, 3.0f),
-      .angle = player->angle,
-      .height = -0.8,
-      .collider.size = 0.2f,
-      .collider.weight = 1.0f,
-      .damage = player->damage,
-      .parent = get_gendex(player),
-    });
-    give_ent_prop(e, EntProp_Projectile);
-  }
+  if (input_key_pressed(SAPP_KEYCODE_SPACE))
+    fire_laser(player);
 
   // TODO: take precautions to prevent movement from being tied to framerate
   float dir = 0.0f;

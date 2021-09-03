@@ -3,13 +3,21 @@
 typedef enum {
   ui_Frame_Hex,
   ui_Frame_Square,
+  ui_Frame_HexSelected,
   ui_Frame_Healthbar,
   ui_Frame_COUNT
 } ui_Frame;
 
 const ol_Rect ui_Frame_spritesheet_area[ui_Frame_COUNT] = {
-   [ui_Frame_Hex] = { 0, 0, 48, 48 },
-   [ui_Frame_Square] = { 48, 0, 48, 48 },
+   [ui_Frame_Hex]         = { 0, 0, 48, 48 },
+   [ui_Frame_HexSelected] = { 0, 0, 48, 48 },
+   [ui_Frame_Square]      = { 48, 0, 48, 48 },
+};
+
+const Vec4 ui_Frame_color[ui_Frame_COUNT] = {
+   [ui_Frame_Hex]         = { 1.0, 0.2, 0.3, 1.0 },
+   [ui_Frame_Square]      = { 1.0, 0.2, 0.3, 1.0 },
+   [ui_Frame_HexSelected] = { 3.0, 0.8, 0.8, 1.0 },
 };
 
 typedef enum { ui_HealthbarShape_Minimal, ui_HealthbarShape_Fancy } ui_HealthbarShape;
@@ -97,8 +105,10 @@ typedef struct {
   size_t layout_count;
   size_t measuremode_counter;
   size_t command_iter;
+  int margin;
   int offset_x, offset_y;
   HealthbarState healthbar;
+  int mx, my;
 } ui_State;
 
 static ui_State _ui_state;
@@ -148,6 +158,11 @@ static ol_Rect* ui_cprect(ol_Rect rect) {
 
 static ol_Rect ui_mkrect(int x, int y, int w, int h) {
     return (ol_Rect) { .x = x, .y = y, .w = w, .h = h };
+}
+
+static void ui_setmousepos(int x, int y) {
+  _ui_state.mx = x;
+  _ui_state.my = y;
 }
 
 static ol_Rect ui_cut_top(ol_Rect *rect, int amount) {
@@ -220,12 +235,21 @@ static ol_Rect _ui_query_bounds(int width, int height) {
   }
   rect.x += curr->bounds.x;
   rect.y += curr->bounds.y;
+  rect.x += _ui_state.margin;
+  rect.y += _ui_state.margin;
+  rect.w -= _ui_state.margin*2;
+  rect.h -= _ui_state.margin*2;
+  _ui_state.margin = 0;
   return rect;
 }
 
 static void ui_setoffset(int x, int y) {
   _ui_state.offset_x = x;
   _ui_state.offset_y = y;
+}
+
+static void ui_margin(int size) {
+  _ui_state.margin += size;
 }
 
 static void ui_gap(int gap) {
@@ -363,6 +387,19 @@ static void ui_image(ol_Image *img) {
   });
 }
 
+static void ui_image_ex(ol_Image *img, ol_Rect part, int w, int h) {
+  ui_addcommand((ui_Command) {
+    .kind = Ui_Cmd_Image,
+    .rect = _ui_query_bounds(w, h),
+    .data = {
+      .image = { 
+        img,
+        part
+      } 
+    }
+  });
+}
+
 static void ui_image_ratio(ol_Image *img, float x, float y) {
   ui_addcommand((ui_Command) {
     .kind = Ui_Cmd_Image,
@@ -385,12 +422,16 @@ static void ui_image_part(ol_Image *img, ol_Rect part) {
   });
 }
 
-static void ui_frame(int width, int height, ui_Frame frame) {
+static bool ui_frame(int width, int height, ui_Frame frame) {
+  ol_Rect bounds = _ui_query_bounds(width, height); 
   ui_addcommand((ui_Command) {
     .kind = Ui_Cmd_Frame,
-    .rect = _ui_query_bounds(width, height),
-    .data.frame = frame,
+    .rect = bounds,
+    .data.frame = { .frame = frame }
   });
+  return 
+    _ui_state.mx >= bounds.x && _ui_state.mx <= (bounds.x+bounds.w) &&
+    _ui_state.my >= bounds.y && _ui_state.my <= (bounds.y+bounds.h);
 }
 
 static void ui_healthbar(int width, int height, float hp, ui_HealthbarShape shape) {
@@ -476,9 +517,9 @@ static void ui_render_healthbar(ol_Rect rect, float hp, ui_HealthbarShape shape)
 static void ui_render() {
   for (ui_Command *cmd = ui_command_next(); cmd != NULL; cmd = ui_command_next()) {
     switch (cmd->kind) {
-      case Ui_Cmd_Text:
-        ol_draw_text(&_ui_state.font, cmd->data.text.text, cmd->rect.x, cmd->rect.y, vec4(1.0, 1.0, 1.0, 1.0));
-      break;
+      case Ui_Cmd_Text: {
+        ol_draw_text(&_ui_state.font, cmd->data.text.text, cmd->rect.x, cmd->rect.y, vec4_f(1.0));
+      } break;
       case Ui_Cmd_Frame: {
         ui_Frame frame = cmd->data.frame.frame;
         if (frame == ui_Frame_Healthbar)
@@ -487,11 +528,11 @@ static void ui_render() {
           ol_ninepatch(&_ui_state.atlas, cmd->rect, (ol_NinePatch) { 
             .inner = { 16, 16, 16, 16 },
             .outer = ui_Frame_spritesheet_area[frame],
-          }, vec4(1.0, 0.2, 0.3, 1.0));
+          }, ui_Frame_color[frame]);
       } break;
-      case Ui_Cmd_Image:
+      case Ui_Cmd_Image: {
         ol_draw_tex_part(cmd->data.image.img, cmd->rect, cmd->data.image.part);
-      break;
+      } break;
       default: {
         assert(false);
       }
