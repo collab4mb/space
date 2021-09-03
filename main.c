@@ -80,6 +80,9 @@ typedef enum {
   /* runs the ai statemachine on the entity*/
   EntProp_HasAI,
 
+  /* split into smaller and smaller asteroids and eventually minerals upon death */
+  EntProp_AsteroidSplit,
+
   /* Knowing how many EntProps there are facilitates allocating just enough memory */
   EntProp_COUNT,
 } EntProp;
@@ -104,10 +107,14 @@ typedef struct {
   uint64_t tick_end;
 } AI;
 
+typedef struct {
+  uint64_t bundled[(EntProp_COUNT + 63) / 64];
+} EntPropBundle;
+
 /* A game entity. Usually, it is rendered somewhere and has some sort of dynamic behavior */
 struct Ent {
   /* packed into 64 bit sections for alignment */
-  uint64_t props[(EntProp_COUNT + 63) / 64];
+  EntPropBundle props;
 
   uint64_t generation;
 
@@ -142,17 +149,33 @@ struct Ent {
   Collider collider;
   AI ai;
 };
+
+static inline bool bundle_has_prop(EntPropBundle *bdl, EntProp prop) {
+  return !!(bdl->bundled[prop/64] & ((uint64_t)1 << (prop%64)));
+}
+static inline EntPropBundle bundle_prop(EntProp prop, EntPropBundle bdl) {
+  bdl.bundled[prop/64] |= (uint64_t)1 << (prop%64);
+  return bdl;
+}
+static inline EntPropBundle unbundle_prop(EntProp prop, EntPropBundle bdl) {
+  bdl.bundled[prop/64] &= ~((uint64_t)1 << (prop%64));
+  return bdl;
+}
+static inline EntPropBundle new_bundle(EntProp prop) {
+  return bundle_prop(prop, (EntPropBundle){0});
+}
+
 static inline bool has_ent_prop(Ent *ent, EntProp prop) {
-  return !!(ent->props[prop/64] & ((uint64_t)1 << (prop%64)));
+  return bundle_has_prop(&ent->props, prop);
 }
 static inline bool take_ent_prop(Ent *ent, EntProp prop) {
   bool before = has_ent_prop(ent, prop);
-  ent->props[prop/64] &= ~((uint64_t)1 << (prop%64));
+  ent->props = unbundle_prop(prop, ent->props);
   return before;
 }
 static inline bool give_ent_prop(Ent *ent, EntProp prop) {
   bool before = has_ent_prop(ent, prop);
-  ent->props[prop/64] |= (uint64_t)1 << (prop%64);
+  ent->props = bundle_prop(prop, ent->props);
   return before;
 }
 
@@ -223,7 +246,35 @@ static Ent *add_ent(Ent ent) {
   return NULL;
 }
 
+/* ends `count` copies of Ent off into different directions */
+static void split_into(int count, Ent ent) {
+  float offset = randf() * PI_f;
+  for (int i = 0; i < count; i++) {
+    float t = (float)i / (float)count;
+    Vec2 dir = vec2_rot(randf() * 0.3f + offset + t * PI_f * 2.0f);
+    ent.vel = mul2_f(dir, 0.2f);
+    ent.pos = add2(ent.pos, mul2_f(dir, 2.0f * ent.collider.size));
+    add_ent(ent);
+  }
+}
+
 static void remove_ent(Ent *ent) {
+  if (has_ent_prop(ent, EntProp_AsteroidSplit))
+    if (ent->collider.size > 0.5f) {
+      ent->collider.weight -= 0.3f;
+      ent->collider.size -= 0.3f;
+      ent->scale = sub3_f(ent->scale, 0.3f);
+      ent->health = 1;
+      ent->passive_rotate_axis = rand3();
+      split_into(2, *ent);
+    } else
+      split_into(2, (Ent) {
+        .props = new_bundle(EntProp_PickUp),
+        .pick_up_after_tick = state->tick + 10,
+        .art = Art_Mineral,
+        .pos = ent->pos,
+        .bloom = 0.35f,
+      });
   ent->generation++;
   take_ent_prop(ent,EntProp_Active);
 }
@@ -246,7 +297,8 @@ static inline Ent *ent_all_iter(Ent *ent) {
 
 static void fire_laser(Ent *ent) {
   Vec2 e_dir = vec2_swap(vec2_rot(ent->angle));
-  Ent *e = add_ent((Ent) {
+  add_ent((Ent) {
+    .props = new_bundle(EntProp_Projectile),
     .art = Art_Laser,
     .bloom = 1.0,
     .pos = add2(ent->pos, mul2_f(e_dir, 2.5f)),
@@ -259,7 +311,6 @@ static void fire_laser(Ent *ent) {
     .damage = ent->damage,
     .parent = get_gendex(ent),
   });
-  give_ent_prop(e, EntProp_Projectile);
 }
 
 ol_Image gem_image;
@@ -388,17 +439,16 @@ void init(void) {
 
   state = calloc(sizeof(State), 1);
 
-  Ent *player = add_ent((Ent) {
+  state->player = get_gendex(add_ent((Ent) {
     .art = Art_Ship,
+    .props = new_bundle(EntProp_Destructible),
     .pos = { -1, 2.5 },
     .collider.size = 2.0f,
     .collider.weight = 0.4f,
     .health = 10,
     .max_hp = 10,
     .damage = 1,
-  });
-  state->player = get_gendex(player);
-  give_ent_prop(player,EntProp_Destructible);
+  }));
 
   add_ent((Ent) {
     .art = Art_Plane,
@@ -410,16 +460,15 @@ void init(void) {
     .collider.weight = 1000.0f,
   });
 
-  for (int i = -1; i < 2; i += 2) {
-    Ent *pillar = add_ent((Ent) {
+  for (int i = -1; i < 2; i += 2)
+    add_ent((Ent) {
+      .props = new_bundle(EntProp_PassiveRotate),
       .art = Art_Pillar,
       .pos = { -1.5 + i * 4.2, 6.5 },
       .height = 0.0,
       .x_rot = 0,
       .passive_rotate_axis = vec3_y,
     });
-    give_ent_prop(pillar, EntProp_PassiveRotate);
-  }
 
   #define ASTEROIDS_PER_RING (7)
   #define ASTEROID_RINGS (3)
@@ -436,18 +485,20 @@ void init(void) {
 
       dist += ASTEROID_DIST_RANDOMIZER * (0.5f - randf()) * 2.0f;
 
-      Ent *ast = add_ent((Ent) {
+      float size = 1.0 + r * (0.1f + 0.2f * randf());
+      add_ent((Ent) {
+        .props = bundle_prop(EntProp_AsteroidSplit,
+                 bundle_prop(EntProp_PassiveRotate,
+                  new_bundle(EntProp_Destructible))),
         .art = Art_Asteroid,
         .pos = mul2_f(vec2_rot(t), dist),
-        .scale = vec3_f(1.0 + r * (0.1f + 0.2f * randf())),
-        .collider.size = 1.0f,
-        .collider.weight = 1.0f,
+        .scale = vec3_f(size),
+        .collider.size = size,
+        .collider.weight = size,
         .passive_rotate_axis = rand3(),
         .health = 1,
         .max_hp = 1,
       });
-      give_ent_prop(ast, EntProp_PassiveRotate);
-      give_ent_prop(ast, EntProp_Destructible);
     }
 
   stm_setup();
