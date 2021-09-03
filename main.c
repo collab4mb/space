@@ -172,6 +172,7 @@ typedef struct {
 typedef struct {
   bool paused;
   float pause_anim;
+  const char *pause_message;
   sg_pipeline pip[Shader_COUNT];
   Mesh meshes[Art_COUNT];
   Ent ents[STATE_MAX_ENTS];
@@ -768,18 +769,25 @@ static void frame(void) {
       ui_column(0, 200);
         ui_setoffset(easeinout(-300, 20.0, fmaxf(fminf(state->pause_anim+0.4f, 1.0f), 0.0f)), 0);
         if (ui_button("Resume")) {
+          state->pause_message = NULL;
           state->pause_anim = fmaxf(fminf(state->pause_anim, 1.0f), 0.0f);
           state->paused = false;
         }
         ui_gap(10);
         ui_setoffset(easeinout(-300, 20.0, fmaxf(fminf(state->pause_anim+0.2f, 1.0f), 0.0f)), 0);
         if (ui_button("Save")) {
-          if (!savestate_save()) printf("Savestate failed!");
+          state->pause_message = "Saved into savestate.sav";
+          if (!savestate_save()) {
+            state->pause_message = "Failed to save to savestate.sav";
+          }
         }
         ui_gap(10);
         ui_setoffset(easeinout(-300, 20.0, fmaxf(fminf(state->pause_anim+0.1f, 1.0f), 0.0f)), 0);
         if (ui_button("Load")) {
-          if (!savestate_load()) printf("Savestate load failed!");
+          state->pause_message = "Loaded savestate.sav";
+          if (!savestate_load()) {
+            state->pause_message = "Failed to load savestate.sav";
+          }
         }
         ui_gap(10);
         ui_setoffset(easeinout(-300, 20.0, fmaxf(fminf(state->pause_anim, 1.0f), 0.0f)), 0);
@@ -788,6 +796,10 @@ static void frame(void) {
         }
         ui_setoffset(0, 0);
       ui_column_end();
+      ui_screen_anchor_xy(0.02, 0.98);
+      if (state->pause_message) {
+        ui_text(state->pause_message);
+      }
     //
     if (state->paused) {
       state->pause_anim += elapsed/1000.0;
@@ -870,6 +882,7 @@ static void event(const sapp_event *ev) {
     case SAPP_EVENTTYPE_KEY_DOWN: {
       input_key_update(ev->key_code,1);
       if (ev->key_code == SAPP_KEYCODE_ESCAPE && !_build_state.appearing) {
+        state->pause_message = NULL;
         state->pause_anim = fmaxf(fminf(state->pause_anim, 1.0f), 0.0f);
         state->paused = !state->paused;
       }
