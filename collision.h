@@ -8,7 +8,7 @@ static void collision_intersects(Ent *a, Ent *b, float *depth, Vec2 *normal) {
     *depth = magmag2(delta) - powf(a->collider.size + b->collider.size, 2);
     if (*depth < 0.0f)
       *normal = norm2(delta);
-  } else if (a_shape == Shape_Line || b_shape == Shape_Line) {
+  } else if (a_shape == Shape_Line ^ b_shape == Shape_Line) {
     Ent *line = (a_shape == Shape_Line) ? a : b;
     Ent *circ = (a_shape == Shape_Circle) ? a : b;
 

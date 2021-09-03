@@ -400,15 +400,28 @@ void init(void) {
   state->player = get_gendex(player);
   give_ent_prop(player,EntProp_Destructible);
 
-  add_ent((Ent) {
-    .art = Art_Plane,
-    .pos = { -1.5, 6.5 },
-    .scale = { 5.0f, 4.0f, 1.0f },
-    .height = -1.0f,
-    .collider.size = 10.0f,
-    .collider.shape = Shape_Line,
-    .collider.weight = 1000.0f,
-  });
+  typedef struct {
+    Vec2 pos;
+    float stretch, angle;
+  } PillarBlueprint;
+
+  PillarBlueprint blueprints[] = {
+    { { -1.5000f, 6.5000f },  5.0000f, 0.0000f },
+    { { -8.5298f, 0.3063f },  7.2095f, 1.9993f },
+    { { 10.9465f, 0.5982f }, 10.5408f, 3.7627f },
+  };
+
+  for (int i = 0; i < sizeof(blueprints) / sizeof(blueprints[0]); i++)
+    add_ent((Ent) {
+      .art = Art_Plane,
+      .pos = blueprints[i].pos,
+      .scale = { blueprints[i].stretch, 4.0f, 1.0f },
+      .angle = blueprints[i].angle,
+      .height = -1.0f,
+      .collider.size = 10.0f,
+      .collider.shape = Shape_Line,
+      .collider.weight = 1000.0f,
+    });
 
   for (int i = -1; i < 2; i += 2) {
     Ent *pillar = add_ent((Ent) {
