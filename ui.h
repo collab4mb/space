@@ -365,6 +365,8 @@ static bool ui_frame(int width, int height, int tag) {
     .rect = bounds,
     .tag = tag,
   });
+  bounds.x += _ui_state.offset_x;
+  bounds.y += _ui_state.offset_y;
   return 
     _ui_state.mx >= bounds.x && _ui_state.mx <= (bounds.x+bounds.w) &&
     _ui_state.my >= bounds.y && _ui_state.my <= (bounds.y+bounds.h);

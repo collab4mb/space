@@ -17,6 +17,11 @@ typedef struct {
   bool semi_connected;
 } _build_Connection;
 
+#define SIDEBAR_SIZE 300
+#define OPTION_BUTTON_SIZE 70
+#define SELECTED_GLOW 0.7f
+#define DISTANCE_DELTA 10.0f
+#define MAX_SELECT_DIST 20.0f
 
 bool _build_connection_finalized(_build_Connection *connection) {
   return connection->begin != NULL && connection->end != NULL;
@@ -159,14 +164,19 @@ void build_draw_3d(Mat4 vp) {
   }
 }
 
-void build_update() {
+void build_update(float delta_time) {
+  if (self.appearing)
+    self.appear_anim += delta_time;
+  else
+    self.appear_anim -= delta_time;
+
   if (input_key_down(SAPP_KEYCODE_LEFT_ALT)) {
-    self.distance += 0.5f;
+    self.distance += DISTANCE_DELTA*delta_time;
   }
   if (input_key_down(SAPP_KEYCODE_LEFT_SHIFT)) {
-    self.distance -= 0.5f;
+    self.distance -= DISTANCE_DELTA*delta_time;
   }
-  self.distance = fminf(fmaxf(self.distance, 0.0), 30.0);
+  self.distance = fminf(fmaxf(self.distance, 0.0), MAX_SELECT_DIST);
   float weight = 0.0;
   Ent *pillar = NULL;
   for (Ent *ent = 0; (ent = ent_all_iter(ent));) {
@@ -177,7 +187,7 @@ void build_update() {
       float dot = -dot2(vec2_swap(vec2_rot(state->player->angle)), norm2(diff));
       float dist = sqrtf(dot2(diff, diff));
 
-      if (dist < 20.0 && dot > weight) {
+      if (dist < MAX_SELECT_DIST && dot > weight) {
         pillar = this_pillar;
         weight = dot;
       }
@@ -186,9 +196,9 @@ void build_update() {
   if (!_build_state.appearing || _build_state.option_selected != _build_Option_Wall) return;
   _build_connection_set_next(&self.connection, pillar);
   if (self.connection.begin)
-    self.connection.begin->bloom = 0.7f;
+    self.connection.begin->bloom = SELECTED_GLOW;
   if (self.connection.end)
-    self.connection.end->bloom = 0.7f;
+    self.connection.end->bloom = SELECTED_GLOW;
 }
 
 void build_draw() {
@@ -197,11 +207,11 @@ void build_draw() {
     // Main row
     ui_row(ui_rel_x(1.0), ui_rel_y(1.0));
       // Interpolate position for animation
-      ui_setoffset(_build_interp(-300, 0, 1.3f), 0);
-      ui_screen(300, ui_rel_y(1.0));
-        ui_frame(300, ui_rel_y(1.0), 1);
+      ui_setoffset(_build_interp(-SIDEBAR_SIZE, 0, 1.3f), 0);
+      ui_screen(SIDEBAR_SIZE, ui_rel_y(1.0));
+        ui_frame(ui_rel_x(1.0), ui_rel_y(1.0), 1);
         ui_margin(10);
-        ui_row(300, ui_rel_y(1.0));
+        ui_row(SIDEBAR_SIZE, ui_rel_y(1.0));
           for (size_t i = 0; i < _build_Option_COUNT; i += 1) {
             ui_margin(5);  
             ui_column(ui_rel_x(1/3.0f), ui_rel_x(1/3.0f)+32); 
@@ -220,12 +230,12 @@ void build_draw() {
       ui_screen_end();
       self.mode_selected = 0;
       for (size_t i = _build_Mode_Build; i < _build_Mode_COUNT; i += 1) {
-        ui_setoffset(0, _build_interp(-60, 10, 3.0f-((float)i/4.0f)));
-        ui_gap(10);
-        ui_screen(60, 60);
-          if (ui_frame(60, 60, self.appearing ? 2 : 0)) {
-            if (input_mouse_down(0))
-              build_leave();
+        ui_setoffset(0, _build_interp(-OPTION_BUTTON_SIZE, 0, 3.0f-((float)i/4.0f)));
+        ui_screen(OPTION_BUTTON_SIZE, OPTION_BUTTON_SIZE);
+          ui_margin(5);
+          if (ui_frame(OPTION_BUTTON_SIZE, OPTION_BUTTON_SIZE, self.appearing ? 2 : 0)) {
+            if (input_mouse_pressed(0))
+              build_toggle();
             self.mode_selected = i;
           }
           ui_screen_anchor_xy(0.5, 0.5);
@@ -237,7 +247,7 @@ void build_draw() {
     ui_row_end();
     ui_screen_anchor_xy(0, 1.0);
     ui_row(ui_rel_x(1.0), 32);
-      ui_gap(300+10);
+      ui_gap(SIDEBAR_SIZE+10);
       ui_setoffset(0, _build_interp(50, 0, 1.6f));
       if (self.mode_selected)
         ui_text(_build_options[self.mode_selected].tooltip);
@@ -245,9 +255,5 @@ void build_draw() {
         ui_text(_build_options[self.option_selected].tooltip);
     ui_row_end();
   ui_screen_end();
-  if (self.appearing)
-    self.appear_anim += 0.016f;
-  else
-    self.appear_anim -= 0.016f;
 }
 #undef self 
