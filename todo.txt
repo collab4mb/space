@@ -1,7 +1,4 @@
 laundry:
-  use less hardcoded values in build.h
-  add ui utility functions to make it easier to maintain build.h
-  remove stupid tag system from the UI
   make it easier to variate between font sizes in UI
 
 semi-fun:
@@ -12,7 +9,10 @@ semi-fun:
 fun:
   save/load functionality
   electricity sources
-  integrate everyhing everyone did and push onto master
 
 later:
   renderer should be extracted from main, main is currently very big
+  relationships between ents
+
+
+

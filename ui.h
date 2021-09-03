@@ -1,22 +1,50 @@
 #include <stdarg.h>
 
+typedef enum {
+  ui_Frame_Hex,
+  ui_Frame_Square,
+  ui_Frame_HexSelected,
+  ui_Frame_Healthbar,
+  ui_Frame_COUNT
+} ui_Frame;
+
+const ol_Rect ui_Frame_spritesheet_area[ui_Frame_COUNT] = {
+   [ui_Frame_Hex]         = { 0, 0, 48, 48 },
+   [ui_Frame_HexSelected] = { 0, 0, 48, 48 },
+   [ui_Frame_Square]      = { 48, 0, 48, 48 },
+};
+
+const Vec4 ui_Frame_color[ui_Frame_COUNT] = {
+   [ui_Frame_Hex]         = { 1.0, 0.2, 0.3, 1.0 },
+   [ui_Frame_Square]      = { 1.0, 0.2, 0.3, 1.0 },
+   [ui_Frame_HexSelected] = { 3.0, 0.8, 0.8, 1.0 },
+};
+
+typedef enum { ui_HealthbarShape_Minimal, ui_HealthbarShape_Fancy } ui_HealthbarShape;
+
 typedef struct {
-    enum { 
-        Ui_Cmd_Frame,
-        Ui_Cmd_Image,
-        Ui_Cmd_Text,
-    } kind;
-    int tag;
-    ol_Rect rect;
-    union {
-      struct {
-        const char *text;
-      } text;
-      struct {
-        ol_Image *img;
-        ol_Rect part;
-      } image;
-    } data;
+  enum { 
+    Ui_Cmd_Frame,
+    Ui_Cmd_Image,
+    Ui_Cmd_Text,
+  } kind;
+  ol_Rect rect;
+  union {
+    struct {
+      /* used for ui_Frame_Healthbar */
+      float hp;
+      ui_HealthbarShape shape;
+
+      ui_Frame frame;
+    } frame;
+    struct {
+      ol_Image *img;
+      ol_Rect part;
+    } image;
+    struct {
+      const char *text;
+    } text;
+  } data;
 } ui_Command;
 
 
@@ -52,8 +80,23 @@ typedef struct {
 
 #define TEXBUF_SIZE (1 << 16)
 
+#define MAX_HEALTHBARS (1 << 4)
 typedef struct {
-  ol_Font *font;
+  Vec2 pos, uv;
+  float hp, fancy_shape;
+} HealthbarVert;
+
+typedef struct {
+  sg_buffer vbuf, ibuf;
+  HealthbarVert verts[MAX_HEALTHBARS * 4];
+  uint16_t      indxs[MAX_HEALTHBARS * 6];
+  int to_render_this_frame;
+  sg_pipeline pip;
+} HealthbarState;
+
+typedef struct {
+  ol_Font font;
+  ol_Image atlas;
   char textbuf[TEXBUF_SIZE];
   size_t textbuf_offs;
   ui_Command commands[1024];
@@ -64,15 +107,45 @@ typedef struct {
   size_t command_iter;
   int margin;
   int offset_x, offset_y;
+  HealthbarState healthbar;
   int mx, my;
 } ui_State;
 
 static ui_State _ui_state;
 
-void ui_init(ol_Font *font) {
+void ui_init() {
   _ui_state = (ui_State) {
-    .font = font
+    .font = ol_load_font("./Orbitron-Regular.ttf"),
+    .atlas = ol_load_image("./ui.png"),
   };
+
+  _ui_state.healthbar.pip = sg_make_pipeline(&(sg_pipeline_desc) {
+    .layout = (sg_layout_desc) {
+      .attrs[ATTR_healthbar_vs_pos].format          = SG_VERTEXFORMAT_FLOAT2,
+      .attrs[ATTR_healthbar_vs_uv].format           = SG_VERTEXFORMAT_FLOAT2,
+      .attrs[ATTR_healthbar_vs_hp].format           = SG_VERTEXFORMAT_FLOAT,
+      .attrs[ATTR_healthbar_vs_fancy_shape].format  = SG_VERTEXFORMAT_FLOAT,
+    },
+    .shader = sg_make_shader(healthbar_shader_desc(sg_query_backend())),
+    .index_type = SG_INDEXTYPE_UINT16,
+    .cull_mode = SG_CULLMODE_BACK,
+    .depth = {
+      .write_enabled = true,
+      .pixel_format = SG_PIXELFORMAT_DEPTH_STENCIL,
+      .compare = SG_COMPAREFUNC_LESS_EQUAL,
+    },
+    .color_count = 2,
+    .colors[0].blend = PREMULTIPLIED_BLEND,
+  });
+  _ui_state.healthbar.vbuf = sg_make_buffer(&(sg_buffer_desc) {
+    .size = sizeof(_ui_state.healthbar.verts),
+    .usage = SG_USAGE_STREAM,
+  });
+  _ui_state.healthbar.ibuf = sg_make_buffer(&(sg_buffer_desc) {
+    .size = sizeof(_ui_state.healthbar.indxs),
+    .usage = SG_USAGE_STREAM,
+    .type = SG_BUFFERTYPE_INDEXBUFFER,
+  });
 }
 
 // -- Cutters --
@@ -283,16 +356,12 @@ static void ui_addcommand(ui_Command cmd) {
 }
 
 static void ui_text(const char *text) {
-  ol_Rect rect = ol_measure_text(_ui_state.font, text, 0, 0);
+  ol_Rect rect = ol_measure_text(&_ui_state.font, text, 0, 0);
   rect = _ui_query_bounds(rect.w, rect.h);
   ui_addcommand((ui_Command) {
     .kind = Ui_Cmd_Text,
     .rect = rect,
-    .data = {
-      .text = { 
-        text
-      } 
-    }
+    .data.text = text,
   });
 }
 
@@ -349,27 +418,30 @@ static void ui_image_part(ol_Image *img, ol_Rect part) {
   ui_addcommand((ui_Command) {
     .kind = Ui_Cmd_Image,
     .rect = _ui_query_bounds(part.w, part.h),
-    .data = {
-      .image = { 
-        img,
-        part
-      } 
-    }
+    .data.image = { img, part }
   });
 }
 
-static bool ui_frame(int width, int height, int tag) {
+static bool ui_frame(int width, int height, ui_Frame frame) {
   ol_Rect bounds = _ui_query_bounds(width, height); 
   ui_addcommand((ui_Command) {
     .kind = Ui_Cmd_Frame,
     .rect = bounds,
-    .tag = tag,
+    .data.frame = { .frame = frame }
   });
   bounds.x += _ui_state.offset_x;
   bounds.y += _ui_state.offset_y;
   return 
     _ui_state.mx >= bounds.x && _ui_state.mx <= (bounds.x+bounds.w) &&
     _ui_state.my >= bounds.y && _ui_state.my <= (bounds.y+bounds.h);
+}
+
+static void ui_healthbar(int width, int height, float hp, ui_HealthbarShape shape) {
+  ui_addcommand((ui_Command) {
+    .kind = Ui_Cmd_Frame,
+    .rect = _ui_query_bounds(width, height),
+    .data.frame = { .frame = ui_Frame_Healthbar, .hp = hp, .shape = shape },
+  });
 }
 
 static void ui_vtextf(const char *fmt, va_list vl) {
@@ -390,16 +462,99 @@ static void ui_textf(const char *fmt, ...) {
 
 
 static void ui_end_pass() {
+  HealthbarState *hbs = &_ui_state.healthbar;
+
+  sg_apply_pipeline(hbs->pip);
+  sg_update_buffer(hbs->vbuf, &(sg_range) {
+    .ptr = _ui_state.healthbar.verts, 
+    .size = sizeof(HealthbarVert) * 4 * hbs->to_render_this_frame,
+  });
+  sg_update_buffer(hbs->ibuf, &(sg_range) {
+    .ptr = _ui_state.healthbar.indxs, 
+    .size = sizeof(uint16_t) * 6 * hbs->to_render_this_frame,
+  });
+  healthbar_vs_params_t vs_params = { .resolution = { sapp_widthf(), sapp_heightf() } };
+  sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_healthbar_vs_params, &SG_RANGE(vs_params));
+  static float time = 0.0f;
+  time += 0.01f;
+  healthbar_fs_params_t fs_params = { .time = time };
+  sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_healthbar_fs_params, &SG_RANGE(fs_params));
+  sg_apply_bindings(&(sg_bindings) {
+    .vertex_buffers[0] = hbs->vbuf,
+    .index_buffer = hbs->ibuf,
+  });
+  sg_draw(0, 6*hbs->to_render_this_frame, 1);
+
   _ui_state.offset_x = 0;
   _ui_state.offset_y = 0;
   _ui_state.command_count = 0;
   _ui_state.command_iter = 0;
   _ui_state.textbuf_offs = 0;
+  _ui_state.healthbar.to_render_this_frame = 0;
 }
 
 static ui_Command *ui_command_next() {
   if (_ui_state.command_count == _ui_state.command_iter) return NULL;
   return &_ui_state.commands[_ui_state.command_iter++];
+}
+
+static void ui_render_healthbar(ol_Rect rect, float hp, ui_HealthbarShape shape) {
+  HealthbarState *hbs = &_ui_state.healthbar;
+
+  memcpy(hbs->verts + 4 * hbs->to_render_this_frame, &((HealthbarVert[]) {
+    { rect.x,          rect.y,           0.0f, 0.2f, hp, shape },
+    { rect.x + rect.w, rect.y,           1.0f, 0.2f, hp, shape },
+    { rect.x + rect.w, rect.y + rect.h,  1.0f, 0.0f, hp, shape },
+    { rect.x,          rect.y + rect.h,  0.0f, 0.0f, hp, shape },
+  }), sizeof(HealthbarVert) * 4);
+
+  uint16_t indices[] = { 0, 1, 2, 2, 3, 0 };
+  for (int i = 0; i < 6; i++)
+    indices[i] += hbs->to_render_this_frame*4;
+  memcpy(hbs->indxs + 6 * hbs->to_render_this_frame, &indices, sizeof(uint16_t) * 6);
+
+  hbs->to_render_this_frame++;
+}
+
+static bool ui_button(const char *text) {
+  ui_measuremode();
+  ui_row(0, 0);
+    ui_text(text);
+  ol_Rect rect = ui_row_end();
+  ui_end_measuremode();
+  ui_screen(rect.w+60, rect.h+20);
+    // With padding
+    bool hovered = ui_frame(rect.w+60, rect.h+20, 0);
+    ui_screen_anchor_xy(0.5, 0.5);
+    ui_text(text);
+  ui_screen_end();
+  return hovered && input_mouse_pressed(0);
+}
+
+static void ui_render() {
+  for (ui_Command *cmd = ui_command_next(); cmd != NULL; cmd = ui_command_next()) {
+    switch (cmd->kind) {
+      case Ui_Cmd_Text: {
+        ol_draw_text(&_ui_state.font, cmd->data.text.text, cmd->rect.x, cmd->rect.y, vec4_f(1.0));
+      } break;
+      case Ui_Cmd_Frame: {
+        ui_Frame frame = cmd->data.frame.frame;
+        if (frame == ui_Frame_Healthbar)
+          ui_render_healthbar(cmd->rect, cmd->data.frame.hp, cmd->data.frame.shape);
+        else
+          ol_ninepatch(&_ui_state.atlas, cmd->rect, (ol_NinePatch) { 
+            .inner = { 16, 16, 16, 16 },
+            .outer = ui_Frame_spritesheet_area[frame],
+          }, ui_Frame_color[frame]);
+      } break;
+      case Ui_Cmd_Image: {
+        ol_draw_tex_part(cmd->data.image.img, cmd->rect, cmd->data.image.part);
+      } break;
+      default: {
+        assert(false);
+      }
+    }
+  }
 }
 
 static void ui_deinit() {

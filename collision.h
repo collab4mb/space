@@ -29,8 +29,6 @@ static void collision_intersects(Ent *a, Ent *b, float *depth, Vec2 *normal) {
 static void collision(Ent *ac) {
   Collider *a_cl = &ac->collider;
 
-  ac->time_since_last_collision += 0.001f;
-
   if (ac->collider.size == 0.0f) return;
 
   Ent *ent = NULL;
@@ -46,9 +44,8 @@ static void collision(Ent *ac) {
     Vec2 normal = { 0 };
     collision_intersects(ac, ent, &depth, &normal);
     if (depth < 0.0f) {
-      /* if stops animation from freezing on first frame if you press against the shape */
-      ent->time_since_last_collision = 0.0f;
-      ac->time_since_last_collision = 0.0f;
+      ent->last_collision = state->tick;
+      ac->last_collision = state->tick;
 
       depth = sqrtf(m_abs(depth));
       float weight_sum = a_cl->weight + e_cl->weight;
@@ -67,31 +64,12 @@ static void collision(Ent *ac) {
   if (ent != NULL
       && has_ent_prop(ent, EntProp_Destructible)
       && has_ent_prop(ac,  EntProp_Projectile)) {
+    ent->health -= ac->damage;
+    ent->last_hit = state->tick;
+    if(has_ent_prop(ent,EntProp_HasAI))
+      ai_damage(ent,&ac->parent);
+
     remove_ent(ac);
-    Ent old = *ent;
-    remove_ent(ent);
-
-    // TODO: somehow dictate what should happen if a entity gets destroyed/dies (just vanish, split, spawn a different entity etc)
-    // For now, just create two smaller asteroids in place of the old one.
-      for (int i = 0; i < 2; i++) {
-        float sign = i ? -1.0f : 1.0f;
-        Ent *ne;
-        if (old.collider.size > 0.4f) {
-          ne = add_ent(old);
-          ne->scale = sub3_f(ne->scale, 0.3f);
-          ne->collider.size -= 0.3f;
-        } else {
-          ne = add_ent((Ent) { .art = Art_Mineral, .bloom = 0.8f });
-          ne->pick_up_after_tick = state->tick + 10;
-          give_ent_prop(ne, EntProp_PickUp);
-        }
-
-        ne->pos = add2_f(old.pos, old.collider.size/2.0f * sign);
-        ne->vel = mul2_f(old.vel, sign);
-
-        if (has_ent_prop(ne, EntProp_PassiveRotate))
-          ne->passive_rotate_axis = rand3();
-      }
   }
 }
 
