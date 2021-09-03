@@ -881,6 +881,7 @@ static void event(const sapp_event *ev) {
   switch (ev->type) {
     case SAPP_EVENTTYPE_KEY_DOWN: {
       input_key_update(ev->key_code,1);
+      build_leave();
       if (ev->key_code == SAPP_KEYCODE_ESCAPE && !_build_state.appearing) {
         state->pause_message = NULL;
         state->pause_anim = fmaxf(fminf(state->pause_anim, 1.0f), 0.0f);
