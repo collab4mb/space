@@ -17,11 +17,25 @@ static bool savestate_save() {
   if (fh == NULL) return false;
 #define WRITE(thing) fwrite(&(thing), sizeof(thing), 1, fh)
 
+  Ent ents_copy[STATE_MAX_ENTS];
+  memcpy(ents_copy, state->ents, sizeof(ents_copy));
+  // This is due to how AI works i have to convert AI_state* to index in the buffer of AI's
+  // TODO: Remove this once not needed
+  for (size_t i = 0; i < STATE_MAX_ENTS; i += 1) {
+    // 1 indexed
+    if (ents_copy[i].ai.state == NULL)
+      ents_copy[i].ai.state = (const AI_state*)(0);
+    else {
+      ents_copy[i].ai.state = (const AI_state*)((ents_copy[i].ai.state-_ai_state)+1);
+    }
+  }
+
   WRITE(sd_check);
   WRITE(sd_entcount);
   WRITE(sd_gems);
   WRITE(sd_player);
-  WRITE(state->ents);
+  WRITE(ents_copy);
+
   
 #undef WRITE
   fclose(fh);
@@ -53,6 +67,15 @@ static bool savestate_load() {
   READ(sd_gems);
   READ(sd_player);
   READ(state->ents);
+  // Big bad hack
+  for (size_t i = 0; i < STATE_MAX_ENTS; i += 1) {
+    if (state->ents[i].ai.state == 0)
+      state->ents[i].ai.state = NULL;
+    else {
+ //     printf("AI id is %zu\n", (size_t)(state->ents[i].ai.state));
+      state->ents[i].ai.state = &_ai_state[(size_t)(state->ents[i].ai.state)-1];
+    }
+  }
 #undef READ
   state->player = sd_player;
   state->gem_count = sd_gems; 
