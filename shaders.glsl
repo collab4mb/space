@@ -178,9 +178,10 @@ void main() {
 
   float d = (hex((uv + vec2(time, time)) * 3.0) + bang * 0.4);
   d *= center + icenter * 0.8;
-  frag_color = hole * scenter * vec4(1, 0, 1, 1) * d * vec4(1.0, 1.0, 1.0, 0.0);
+  frag_color = hole * scenter * vec4(1, 0, 1, 1) * d;
 
   float brightness = dot(frag_color.rgb, vec3(0.2126, 0.7152, 0.0722));
+  if (brightness < 0.04) discard;
   bright_color = vec4(step(brightness, 0.04) * frag_color.rgb, 1);
 }
 @end
@@ -332,7 +333,8 @@ void main() {
 
 @fs overlay_fs
 uniform sampler2D tex;
-out vec4 frag_color;
+layout (location = 0) out vec4 frag_color;
+layout (location = 1) out vec4 bright_color;
 in vec2 fs_uv;
 in vec4 fs_modulate;
 in float fs_istxt;
@@ -343,6 +345,9 @@ void main() {
     color = vec4(color.r, color.r, color.r, color.r);
   }
   frag_color = color*fs_modulate;
+
+  float brightness = dot(frag_color.rgb, vec3(0.2126, 0.7152, 0.0722));
+  bright_color = vec4(step(brightness, 0.98) * brightness * frag_color.rgb * 0.55, 1);
 }
 @end
 
