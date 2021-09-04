@@ -73,6 +73,7 @@ static Vec2 sign2(Vec2 a);
 static Vec2 vec2_swap(Vec2 v);
 static Vec2 vec2_rot(float rot);
 static float rot_vec2(Vec2 rot);
+static Vec2 lerp2(Vec2 a, Vec2 b, float t);
 
 //3d
 static Vec3 vec3(float x, float y, float z);
@@ -383,6 +384,10 @@ static Vec2 vec2_rot(float rot) {
 
 static float rot_vec2(Vec2 rot) {
   return atan2f(rot.y, rot.x);
+}
+
+static Vec2 lerp2(Vec2 a, Vec2 b, float t) {
+  return add2(mul2_f(a, 1.0f - t), mul2_f(b, t));
 }
 
 static Vec3 max3_f(Vec3 v, float f) {

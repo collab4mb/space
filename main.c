@@ -641,28 +641,24 @@ static void tick(void) {
   state->tick++;
 
   Ent *player = try_gendex(state->player);
-  if(player!=NULL)
+  if (player != NULL)
     player_update(player);
 
   for (Ent *ent = 0; (ent = ent_all_iter(ent));) {
-    if(has_ent_prop(ent,EntProp_HasAI))
+    if (has_ent_prop(ent, EntProp_HasAI))
       ai_run(ent);
 
-    if(has_ent_prop(ent, EntProp_Destructible)&&ent->health <= 0) {
+    if (has_ent_prop(ent, EntProp_Destructible) && ent->health <= 0)
       remove_ent(ent);
-      //TODO: handle loot and asteroid splitting
-    }
   }
 
-  for (Ent *ent = 0; (ent = ent_all_iter(ent));)
-    collision(ent);
   for (Ent *ent = 0; (ent = ent_all_iter(ent));) {
     collision_movement_update(ent);
 
     if (has_ent_prop(ent, EntProp_PickUp)) {
       ent->height = sinf(ent->pos.x + ent->pos.y + (float) state->tick / 14.0) * 0.3f;
       Ent *p = try_gendex(state->player);
-      if (p!=NULL&&ent->pick_up_after_tick <= state->tick) {
+      if (p != NULL && ent->pick_up_after_tick <= state->tick) {
 
         #define SUCK_DIST (6.0f)
         Vec2 delta = sub2(p->pos, ent->pos);
@@ -671,10 +667,8 @@ static void tick(void) {
 
         if (dist < 0.3f) {
           state->gem_count += 1;
-          take_ent_prop(ent, EntProp_Active);
-        }
-        if (dist < 0.3f)
           remove_ent(ent);
+        }
         else if (dist < SUCK_DIST)
           ent->pos = add2(
             ent->pos,
