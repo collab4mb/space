@@ -4,6 +4,7 @@
 typedef enum {
   _build_Option_Pillar,
   _build_Option_Wall,
+  _build_Option_Burner,
   _build_Option_COUNT,
 } _build_Option;
 
@@ -67,6 +68,7 @@ typedef struct {
 static const build_Option _build_options[] = {
   {"Pillar", "This is a pillar, press space to place a pillar", { 0, 48, 48, 48 } },
   {"Force field",   "This is a wall, you need to select 2 pillars to emerge a force field", { 48, 48, 48, 48 } },
+  {"Burner",   "Will burn yer crystals", { 48, 48, 48, 48 } },
   // Top options
   {"Build", "Leave build mode", { 48+48, 48, 48, 48 } },
 };
@@ -140,6 +142,10 @@ static bool build_event(const sapp_event *ev) {
     case SAPP_EVENTTYPE_KEY_DOWN: {
       if (ev->key_code == SAPP_KEYCODE_TAB) {
         build_toggle();
+        return true;
+      }
+      if (ev->key_code == SAPP_KEYCODE_ESCAPE && self.appearing) {
+        build_leave();
         return true;
       }
       else if (self.appearing && ev->key_code == SAPP_KEYCODE_SPACE) {
@@ -234,13 +240,13 @@ static void _build_sidebar() {
         ui_margin(14);
         ui_prompt(&_build_state.search, ui_rel_x(1.0));
       ui_screen_end(0);
-      ui_row(SIDEBAR_SIZE, ui_rel_y(1.0));
+      ui_row(ui_rel_x(1.0), ui_rel_y(1.0));
         for (size_t i = 0; i < _build_Option_COUNT; i += 1) {
           if (_build_state.search.input[0]) {
             if (strstr((const char*)_build_options[i].name, (const char*)_build_state.search.input) == NULL)
               continue;
           }
-          ui_margin(5);  
+          ui_margin(10);  
           ui_column(ui_rel_x(1/3.0f), ui_rel_x(1/3.0f)+32); 
             if (_build_icon_button(ui_rel_x(1.0), ui_rel_x(1.0), i, i == self.option_selected)) {
               self.connection = (_build_Connection) { 0 };
@@ -259,6 +265,7 @@ static void _build_sidebar() {
 }
 
 static void build_draw() {
+  self.tooltip = self.option_selected;
   // Main overlay
   ui_screen(sapp_width(), sapp_height());
     // Main row

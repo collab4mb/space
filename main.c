@@ -789,7 +789,6 @@ static void frame(void) {
   build_draw_3d(vp);
 
   ol_begin();
-  ui_begin();
   ui_setmousepos((int)_input_mouse_x, (int)_input_mouse_y);
 
   
@@ -936,6 +935,7 @@ static void cleanup(void) {
 }
 
 static void event(const sapp_event *ev) {
+  if (ui_event(ev)) return;
   if (!state->paused && build_event(ev)) return;
   switch (ev->type) {
     case SAPP_EVENTTYPE_KEY_DOWN: {
@@ -951,7 +951,6 @@ static void event(const sapp_event *ev) {
       }
     } break;
     case SAPP_EVENTTYPE_CHAR: {
-      ui_append((char []) {(char) ev->char_code, 0});
     } break;
     case SAPP_EVENTTYPE_MOUSE_MOVE: {
       _input_mouse_x = ev->mouse_x;

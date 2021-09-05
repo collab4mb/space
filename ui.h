@@ -198,12 +198,6 @@ static bool ui_erase() {
   _ui_state.active_prompt->input[--_ui_state.active_prompt->caret] = 0;
 }
 
-static bool ui_begin() {
-  // Defocus prompt
-  if (input_mouse_pressed(0) || input_key_pressed(SAPP_KEYCODE_ESCAPE))
-    _ui_state.active_prompt = NULL;
-}
-
 //
 // Will append characters to current prompt
 //
@@ -223,6 +217,36 @@ static void ui_append(const char *str) {
 
   memcpy(_ui_state.active_prompt->input+caret, str, l);
   _ui_state.active_prompt->caret += l;
+}
+
+//
+// Process events
+// Returns true if event was significant
+//
+static bool ui_event(const sapp_event *ev) {
+  if (_ui_state.active_prompt != NULL &&
+      ev->type == SAPP_EVENTTYPE_KEY_DOWN) {
+    if (ev->key_code == SAPP_KEYCODE_BACKSPACE) 
+      ui_erase();
+    if (ev->key_code == SAPP_KEYCODE_LEFT) 
+      ui_erase();
+    if (ev->key_code == SAPP_KEYCODE_ESCAPE) 
+      // Unfocus
+      _ui_state.active_prompt = NULL;
+    return true;
+  }
+  if (_ui_state.active_prompt != NULL &&
+      ev->type == SAPP_EVENTTYPE_MOUSE_DOWN &&
+      ev->mouse_button == 0) {
+    _ui_state.active_prompt = NULL;
+    return false;
+  }
+  if (_ui_state.active_prompt != NULL &&
+      ev->type == SAPP_EVENTTYPE_CHAR) {
+    ui_append((char []) {(char) ev->char_code, 0});
+    return true;
+  }
+  return false;
 }
 
 static ui_Layout* _ui_getlayout(size_t offs) {
