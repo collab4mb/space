@@ -1,6 +1,3 @@
-laundry:
-  make it easier to variate between font sizes in UI
-
 semi-fun:
   make sure that it's not possible to place pillars at very high proximity
   add more animations to build mode

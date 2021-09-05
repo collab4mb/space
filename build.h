@@ -47,6 +47,7 @@ static void _build_connection_select(_build_Connection *connection) {
 }
 
 typedef struct {
+  ui_Prompt search;
   _build_Option option_selected;
   size_t tooltip;
   float distance;
@@ -220,34 +221,50 @@ static bool _build_icon_button(int w, int h, size_t i, bool selected) {
   return pressed;
 }
 
+static void _build_sidebar() {
+  ui_setoffset(_build_interp(-SIDEBAR_SIZE, 0, 1.3f), 0);
+  ui_screen(SIDEBAR_SIZE, ui_rel_y(1.0));
+    ui_set_font(ui_Font_Small);
+    ui_frame(ui_rel_x(1.0), ui_rel_y(1.0), 1);
+    ui_margin(10);
+    ui_column(ui_rel_x(1.0), ui_rel_y(1.0));
+      // Searchbar
+      ui_screen(ui_rel_x(1.0), 50);
+        ui_frame(ui_rel_x(1.0), ui_rel_y(1.0), ui_Frame_Square);
+        ui_margin(14);
+        ui_prompt(&_build_state.search, ui_rel_x(1.0));
+      ui_screen_end(0);
+      ui_row(SIDEBAR_SIZE, ui_rel_y(1.0));
+        for (size_t i = 0; i < _build_Option_COUNT; i += 1) {
+          if (_build_state.search.input[0]) {
+            if (strstr((const char*)_build_options[i].name, (const char*)_build_state.search.input) == NULL)
+              continue;
+          }
+          ui_margin(5);  
+          ui_column(ui_rel_x(1/3.0f), ui_rel_x(1/3.0f)+32); 
+            if (_build_icon_button(ui_rel_x(1.0), ui_rel_x(1.0), i, i == self.option_selected)) {
+              self.connection = (_build_Connection) { 0 };
+              self.option_selected = i;
+            }
+            ui_screen(ui_rel_x(1.0), 32);
+              ui_screen_anchor_x(0.5);
+              ui_text(_build_options[i].name);
+            ui_screen_end();
+          ui_column_end();
+        }
+      ui_row_end();
+    ui_column_end();
+    ui_set_font(ui_Font_Normal);
+  ui_screen_end();
+}
+
 static void build_draw() {
   // Main overlay
   ui_screen(sapp_width(), sapp_height());
     // Main row
     ui_row(ui_rel_x(1.0), ui_rel_y(1.0));
       // Interpolate position for animation
-      ui_setoffset(_build_interp(-SIDEBAR_SIZE, 0, 1.3f), 0);
-      ui_screen(SIDEBAR_SIZE, ui_rel_y(1.0));
-        ui_set_font(ui_Font_Small);
-        ui_frame(ui_rel_x(1.0), ui_rel_y(1.0), 1);
-        ui_margin(10);
-        ui_row(SIDEBAR_SIZE, ui_rel_y(1.0));
-          for (size_t i = 0; i < _build_Option_COUNT; i += 1) {
-            ui_margin(5);  
-            ui_column(ui_rel_x(1/3.0f), ui_rel_x(1/3.0f)+32); 
-              if (_build_icon_button(ui_rel_x(1.0), ui_rel_x(1.0), i, i == self.option_selected)) {
-                self.connection = (_build_Connection) { 0 };
-                self.option_selected = i;
-              }
-              ui_screen(ui_rel_x(1.0), 32);
-                ui_screen_anchor_x(0.5);
-                ui_text(_build_options[i].name);
-              ui_screen_end();
-            ui_column_end();
-          }
-        ui_row_end();
-        ui_set_font(ui_Font_Normal);
-      ui_screen_end();
+      _build_sidebar();
       for (size_t i = _build_Mode_Build; i < _build_Mode_COUNT; i += 1) {
         ui_setoffset(0, _build_interp(-OPTION_BUTTON_SIZE, 0, 3.0f-((float)i/4.0f)));
         ui_margin(5);

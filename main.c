@@ -51,7 +51,6 @@ typedef uint64_t Tick;
 typedef struct Ent Ent;
 typedef struct GenDex GenDex;
 
-#include "ui.h"
 //The list of enums/states will be getting bigger as we add more entities,
 //so move it to its own file
 #include "ai_type.h"
@@ -327,6 +326,7 @@ static void fire_laser(Ent *ent) {
 
 ol_Image gem_image;
 
+#include "ui.h"
 #include "build.h"
 #include "collision.h"
 #include "player.h"
@@ -789,6 +789,7 @@ static void frame(void) {
   build_draw_3d(vp);
 
   ol_begin();
+  ui_begin();
   ui_setmousepos((int)_input_mouse_x, (int)_input_mouse_y);
 
   
@@ -938,6 +939,8 @@ static void event(const sapp_event *ev) {
   if (!state->paused && build_event(ev)) return;
   switch (ev->type) {
     case SAPP_EVENTTYPE_KEY_DOWN: {
+      if (ev->key_code == SAPP_KEYCODE_BACKSPACE && ui_erase())
+        break;
       input_key_update(ev->key_code,1);
       if (ev->key_code == SAPP_KEYCODE_ESCAPE)
         build_leave();
@@ -946,6 +949,9 @@ static void event(const sapp_event *ev) {
         state->pause_anim = fmaxf(fminf(state->pause_anim, 1.0f), 0.0f);
         state->paused = !state->paused;
       }
+    } break;
+    case SAPP_EVENTTYPE_CHAR: {
+      ui_append((char []) {(char) ev->char_code, 0});
     } break;
     case SAPP_EVENTTYPE_MOUSE_MOVE: {
       _input_mouse_x = ev->mouse_x;

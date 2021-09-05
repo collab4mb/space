@@ -47,6 +47,12 @@ typedef struct {
   } data;
 } ui_Command;
 
+#define UI_PROMPT_LEN_MAX 1024
+
+typedef struct {
+  size_t caret;
+  char input[UI_PROMPT_LEN_MAX];
+} ui_Prompt;
 
 typedef struct {
   float anchor_x;
@@ -79,8 +85,8 @@ typedef struct {
 } ui_Layout;
 
 #define TEXBUF_SIZE (1 << 16)
-
 #define MAX_HEALTHBARS (1 << 4)
+
 typedef struct {
   Vec2 pos, uv;
   float hp, fancy_shape;
@@ -95,22 +101,33 @@ typedef struct {
 } HealthbarState;
 
 typedef enum {
+  // 32 pixels
   ui_Font_Normal,
+  // 24 pixels
   ui_Font_Small,
+  // 40 pixels
   ui_Font_Big,
+  // Add monospace font here
 } ui_Font;
 
 typedef struct {
+  ui_Prompt *active_prompt;
   ol_Font fonts[3];
   ol_Font *font;
   ol_Image atlas;
   Vec4 modulate;
+  
+  // Cheap continous text buffer, reset after ui_end
   char textbuf[TEXBUF_SIZE];
   size_t textbuf_offs;
+  
   ui_Command commands[1024];
   size_t command_count;
+
+  // E.g. nesting limit is 32
   ui_Layout layouts[32];
   size_t layout_count;
+
   size_t measuremode_counter;
   size_t command_iter;
   int margin;
@@ -162,65 +179,59 @@ void ui_init() {
   });
 }
 
-// -- Cutters --
-_Thread_local ol_Rect _ui_rswap;
-
-static ol_Rect* ui_cprect(ol_Rect rect) {
-    _ui_rswap = rect;
-    return &_ui_rswap;
-}
-
-static ol_Rect ui_mkrect(int x, int y, int w, int h) {
-    return (ol_Rect) { .x = x, .y = y, .w = w, .h = h };
-}
-
 static void ui_setmousepos(int x, int y) {
   _ui_state.mx = x;
   _ui_state.my = y;
 }
 
-static ol_Rect ui_cut_top(ol_Rect *rect, int amount) {
-    int init = rect->y;
-    rect->y += amount;
-    rect->h -= amount;
-
-    return ui_mkrect(rect->x, init, rect->w, amount);
+//
+// Erases last char of a prompt, if exists
+// Returns true if the event was significant
+//
+static bool ui_erase() {
+  if (_ui_state.active_prompt == NULL) 
+    return false;
+  // Nothing to erase
+  if (_ui_state.active_prompt->caret == 0) 
+    return true; 
+  // Erase last char
+  _ui_state.active_prompt->input[--_ui_state.active_prompt->caret] = 0;
 }
 
-static ol_Rect ui_cut_bottom(ol_Rect *rect, int amount) {
-    int init = rect->y+rect->h-amount;
-    rect->h -= amount;
-
-    return ui_mkrect(rect->x, init, rect->w, amount);
+static bool ui_begin() {
+  // Defocus prompt
+  if (input_mouse_pressed(0) || input_key_pressed(SAPP_KEYCODE_ESCAPE))
+    _ui_state.active_prompt = NULL;
 }
 
-static ol_Rect ui_cut_left(ol_Rect *rect, int amount) {
-    int init = rect->x;
-    rect->x += amount;
-    rect->w -= amount;
+//
+// Will append characters to current prompt
+//
+static void ui_append(const char *str) {
+  // Nothing to add
+  if (_ui_state.active_prompt == NULL) 
+    return;
+  size_t l = strlen(str);
+  size_t caret = _ui_state.active_prompt->caret;
+  assert(caret < UI_PROMPT_LEN_MAX && "UI: Malformed caret");
 
-    return ui_mkrect(init, rect->y, amount, rect->h);
-}
+  // Overflow?
+  if (l + caret > UI_PROMPT_LEN_MAX) {
+    // Ignore chars that don't fit
+    l -= l + caret - UI_PROMPT_LEN_MAX;
+  }
 
-static ol_Rect ui_cut_right(ol_Rect *rect, int amount) {
-    int init = rect->x+rect->w-amount;
-    rect->w -= amount;
-
-    return ui_mkrect(init, rect->y, amount, rect->h);
-}
-
-// Center relative to
-static int _ui_crt(int y, int parent_size, int my_size) {
-  return parent_size/2+my_size/2+y;
+  memcpy(_ui_state.active_prompt->input+caret, str, l);
+  _ui_state.active_prompt->caret += l;
 }
 
 static ui_Layout* _ui_getlayout(size_t offs) {
-  assert(_ui_state.layout_count > offs && "Illegal access on layout stack");
+  assert(_ui_state.layout_count > offs && "UI: Illegal access on layout stack");
   return &_ui_state.layouts[_ui_state.layout_count-offs-1];
 } 
 
 static ui_Layout* _ui_addlayout() {
-  assert(_ui_state.layout_count < 32 && "Layout stack overflow");
+  assert(_ui_state.layout_count < 32 && "UI: Layout stack overflow");
   return &_ui_state.layouts[_ui_state.layout_count];
 } 
 
@@ -448,6 +459,12 @@ static void ui_image_part(ol_Image *img, ol_Rect part) {
   });
 }
 
+static bool _ui_checkrect(ol_Rect bounds) {
+  return 
+    _ui_state.mx >= bounds.x && _ui_state.mx <= (bounds.x+bounds.w) &&
+    _ui_state.my >= bounds.y && _ui_state.my <= (bounds.y+bounds.h);
+}
+
 static bool ui_frame(int width, int height, ui_Frame frame) {
   ol_Rect bounds = _ui_query_bounds(width, height); 
   ui_addcommand((ui_Command) {
@@ -457,9 +474,7 @@ static bool ui_frame(int width, int height, ui_Frame frame) {
   });
   bounds.x += _ui_state.offset_x;
   bounds.y += _ui_state.offset_y;
-  return 
-    _ui_state.mx >= bounds.x && _ui_state.mx <= (bounds.x+bounds.w) &&
-    _ui_state.my >= bounds.y && _ui_state.my <= (bounds.y+bounds.h);
+  return _ui_checkrect(bounds);
 }
 
 static void ui_healthbar(int width, int height, float hp, ui_HealthbarShape shape) {
@@ -559,6 +574,29 @@ static bool ui_button(const char *text) {
     ui_text(text);
   ui_screen_end();
   return hovered && input_mouse_pressed(0);
+}
+
+//
+// Renders prompt you pass, note that the prompt you pass must 
+// live until active_prompt is assigned to another value
+// or longer. Height will equal to the size of the font.
+// 
+static void ui_prompt(ui_Prompt *prompt, int xlimit) {
+  ui_screen(xlimit, _ui_state.font->size);
+    // Blink blink
+    // Every 20th tick will swap between shown and hidden
+    if (_ui_state.active_prompt == prompt && (state->tick / 20) % 2 == 0) 
+      // The `|' is a hack for a carriage ;D
+      ui_textf("%s|", prompt->input);
+    else 
+      ui_textf("%s", prompt->input);
+    ol_Rect bounds = _ui_query_bounds(xlimit, _ui_state.font->size);
+  ui_screen_end();
+  // Check if input field has been pressed
+  if (input_mouse_down(0) && _ui_checkrect(bounds)) {
+    // Thou shalt not trust user-made prompts
+    _ui_state.active_prompt = prompt;
+  }
 }
 
 static void ui_render() {
