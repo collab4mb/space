@@ -1,3 +1,4 @@
+#include "math.h"
 #include <math.h>
 
 typedef enum {
@@ -17,17 +18,17 @@ typedef struct {
   bool semi_connected;
 } _build_Connection;
 
-#define SIDEBAR_SIZE 300
+#define SIDEBAR_SIZE 370
 #define OPTION_BUTTON_SIZE 70
 #define SELECTED_GLOW 0.7f
 #define DISTANCE_DELTA 10.0f
 #define MAX_SELECT_DIST 20.0f
 
-bool _build_connection_finalized(_build_Connection *connection) {
+static bool _build_connection_finalized(_build_Connection *connection) {
   return connection->begin != NULL && connection->end != NULL;
 }
 
-void _build_connection_set_next(_build_Connection *connection, Ent *ent) {
+static void _build_connection_set_next(_build_Connection *connection, Ent *ent) {
   if (connection->semi_connected) {
     connection->end = ent;
   }
@@ -36,7 +37,7 @@ void _build_connection_set_next(_build_Connection *connection, Ent *ent) {
   }
 }
 
-void _build_connection_select(_build_Connection *connection) {
+static void _build_connection_select(_build_Connection *connection) {
   if (connection->semi_connected && connection->end != NULL) {
     *connection = (_build_Connection) { 0 };
   }
@@ -62,7 +63,7 @@ typedef struct {
   ol_Rect part;
 } build_Option;
 
-const build_Option _build_options[] = {
+static const build_Option _build_options[] = {
   {"Pillar", "This is a pillar, press space to place a pillar", { 0, 48, 48, 48 } },
   {"Force field",   "This is a wall, you need to select 2 pillars to emerge a force field", { 48, 48, 48, 48 } },
   // Top options
@@ -71,32 +72,32 @@ const build_Option _build_options[] = {
 
 #define self _build_state
 
-void build_enter() {
+static void build_enter() {
   self.distance = 10;
-  self.appear_anim = fmaxf(fminf(self.appear_anim, 1.0f), 0.0f);
+  self.appear_anim = m_clamp(self.appear_anim, 0.0f, 1.0f);
   self.appearing = true;
 }
 
-void build_leave() {
-  self.appear_anim = fmaxf(fminf(self.appear_anim, 1.0f), 0.0f);
+static void build_leave() {
+  self.appear_anim = m_clamp(self.appear_anim, 0.0f, 1.0f);
   self.appearing = false;
 }
 
-void build_toggle() {
+static void build_toggle() {
   if (self.appearing) build_leave();
   else build_enter();
 }
 
-float easeinout(float from, float to, float x) {
+static float easeinout(float from, float to, float x) {
   float v = -(cosf((float)M_PI * x) - 1) / 2;
   return from-v*(from-to);
 }
 
-int _build_interp(int from, int to, float mul) {
+static int _build_interp(int from, int to, float mul) {
   return (int)easeinout((float)from, (float)to, fmaxf(fminf(self.appear_anim*mul, 1.0f), 0.0f));
 }
 
-bool _build_make_ent(Ent *plr, Ent *ent) {
+static bool _build_make_ent(Ent *plr, Ent *ent) {
   if (self.option_selected == _build_Option_Pillar) {
     *ent = (Ent) {
       .art = Art_Pillar,
@@ -116,7 +117,7 @@ bool _build_make_ent(Ent *plr, Ent *ent) {
       *ent = (Ent) {
         .art = Art_Plane,
         .pos = pos,
-        .angle = atan2f(diff.x, diff.y)+PI_f/2.0f,
+        .angle = -rot_vec2(diff),
         .scale = { mag2(diff)/2.0f+0.4f, 4.0f, 1.0f },
         .height = -1.0f,
         .collider.size = mag2(diff)/2.0f,
@@ -130,7 +131,7 @@ bool _build_make_ent(Ent *plr, Ent *ent) {
 }
 
 static Ent* add_ent(Ent ent);
-bool build_event(const sapp_event *ev) {
+static bool build_event(const sapp_event *ev) {
   switch (ev->type) {
     case SAPP_EVENTTYPE_MOUSE_SCROLL: {
       self.distance += ev->scroll_y;
@@ -140,7 +141,7 @@ bool build_event(const sapp_event *ev) {
         build_toggle();
         return true;
       }
-      else if (self.appear_anim > 0.0f && ev->key_code == SAPP_KEYCODE_SPACE) {
+      else if (self.appearing && ev->key_code == SAPP_KEYCODE_SPACE) {
         Ent dest, *plr = try_gendex(state->player);
         if (plr && _build_make_ent(plr, &dest)) {
           add_ent(dest);
@@ -155,7 +156,7 @@ bool build_event(const sapp_event *ev) {
 }
 
 static void draw_ent(Mat4 vp, Ent *ent);
-void build_draw_3d(Mat4 vp) {
+static void build_draw_3d(Mat4 vp) {
   Ent dest, *plr = try_gendex(state->player);
   if (plr && _build_make_ent(plr, &dest) && self.appearing) {
     sg_apply_pipeline(state->pip[state->meshes[dest.art].shader]);
@@ -164,7 +165,7 @@ void build_draw_3d(Mat4 vp) {
   }
 }
 
-void build_update(float delta_time) {
+static void build_update(float delta_time) {
   if (self.appearing)
     self.appear_anim += delta_time;
   else
@@ -203,7 +204,7 @@ void build_update(float delta_time) {
     self.connection.end->bloom = SELECTED_GLOW;
 }
 
-bool _build_icon_button(int w, int h, size_t i, bool selected) {
+static bool _build_icon_button(int w, int h, size_t i, bool selected) {
   bool pressed = false;
   bool hovered;
   ui_Frame frame = selected ? ui_Frame_HexSelected : ui_Frame_Hex;
@@ -219,7 +220,7 @@ bool _build_icon_button(int w, int h, size_t i, bool selected) {
   return pressed;
 }
 
-void build_draw() {
+static void build_draw() {
   // Main overlay
   ui_screen(sapp_width(), sapp_height());
     // Main row
@@ -227,6 +228,7 @@ void build_draw() {
       // Interpolate position for animation
       ui_setoffset(_build_interp(-SIDEBAR_SIZE, 0, 1.3f), 0);
       ui_screen(SIDEBAR_SIZE, ui_rel_y(1.0));
+        ui_set_font(ui_Font_Small);
         ui_frame(ui_rel_x(1.0), ui_rel_y(1.0), 1);
         ui_margin(10);
         ui_row(SIDEBAR_SIZE, ui_rel_y(1.0));
@@ -237,10 +239,14 @@ void build_draw() {
                 self.connection = (_build_Connection) { 0 };
                 self.option_selected = i;
               }
-              ui_text(_build_options[i].name);
+              ui_screen(ui_rel_x(1.0), 32);
+                ui_screen_anchor_x(0.5);
+                ui_text(_build_options[i].name);
+              ui_screen_end();
             ui_column_end();
           }
         ui_row_end();
+        ui_set_font(ui_Font_Normal);
       ui_screen_end();
       for (size_t i = _build_Mode_Build; i < _build_Mode_COUNT; i += 1) {
         ui_setoffset(0, _build_interp(-OPTION_BUTTON_SIZE, 0, 3.0f-((float)i/4.0f)));

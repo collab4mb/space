@@ -15,9 +15,9 @@ const ol_Rect ui_Frame_spritesheet_area[ui_Frame_COUNT] = {
 };
 
 const Vec4 ui_Frame_color[ui_Frame_COUNT] = {
-   [ui_Frame_Hex]         = { 1.0, 0.2, 0.3, 1.0 },
-   [ui_Frame_Square]      = { 1.0, 0.2, 0.3, 1.0 },
-   [ui_Frame_HexSelected] = { 3.0, 0.8, 0.8, 1.0 },
+   [ui_Frame_Hex]         = {{ 1.0f, 0.2f, 0.3f, 1.0f }},
+   [ui_Frame_Square]      = {{ 1.0f, 0.2f, 0.3f, 1.0f }},
+   [ui_Frame_HexSelected] = {{ 3.0f, 0.8f, 0.8f, 1.0f }},
 };
 
 typedef enum { ui_HealthbarShape_Minimal, ui_HealthbarShape_Fancy } ui_HealthbarShape;
@@ -34,7 +34,6 @@ typedef struct {
       /* used for ui_Frame_Healthbar */
       float hp;
       ui_HealthbarShape shape;
-
       ui_Frame frame;
     } frame;
     struct {
@@ -43,6 +42,7 @@ typedef struct {
     } image;
     struct {
       const char *text;
+      ol_Font *font;
     } text;
   } data;
 } ui_Command;
@@ -94,9 +94,17 @@ typedef struct {
   sg_pipeline pip;
 } HealthbarState;
 
+typedef enum {
+  ui_Font_Normal,
+  ui_Font_Small,
+  ui_Font_Big,
+} ui_Font;
+
 typedef struct {
-  ol_Font font;
+  ol_Font fonts[3];
+  ol_Font *font;
   ol_Image atlas;
+  Vec4 modulate;
   char textbuf[TEXBUF_SIZE];
   size_t textbuf_offs;
   ui_Command commands[1024];
@@ -115,9 +123,15 @@ static ui_State _ui_state;
 
 void ui_init() {
   _ui_state = (ui_State) {
-    .font = ol_load_font("./Orbitron-Regular.ttf"),
+    .fonts = {
+      [ui_Font_Small] =  ol_load_font("./Orbitron-Regular.ttf", 24),
+      [ui_Font_Normal] = ol_load_font("./Orbitron-Regular.ttf", 32),
+      [ui_Font_Big] =    ol_load_font("./Orbitron-Regular.ttf", 40),
+    },
+    .modulate = vec4(1.0, 1.0, 1.0, 1.0),
     .atlas = ol_load_image("./ui.png"),
   };
+  _ui_state.font = &_ui_state.fonts[ui_Font_Normal];
 
   _ui_state.healthbar.pip = sg_make_pipeline(&(sg_pipeline_desc) {
     .layout = (sg_layout_desc) {
@@ -355,13 +369,25 @@ static void ui_addcommand(ui_Command cmd) {
   }
 }
 
+static void ui_set_font(ui_Font font) {
+  _ui_state.font = &_ui_state.fonts[font];
+}
+
+static void ui_setcolor(Vec4 modulate) {
+  _ui_state.modulate = modulate;
+}
+
+static void ui_resetcolor() {
+  _ui_state.modulate = vec4(1.0, 1.0, 1.0, 1.0);
+}
+
 static void ui_text(const char *text) {
-  ol_Rect rect = ol_measure_text(&_ui_state.font, text, 0, 0);
+  ol_Rect rect = ol_measure_text(_ui_state.font, text, 0, 0);
   rect = _ui_query_bounds(rect.w, rect.h);
   ui_addcommand((ui_Command) {
     .kind = Ui_Cmd_Text,
     .rect = rect,
-    .data.text = text,
+    .data.text = { text, _ui_state.font },
   });
 }
 
@@ -467,11 +493,11 @@ static void ui_end_pass() {
   sg_apply_pipeline(hbs->pip);
   sg_update_buffer(hbs->vbuf, &(sg_range) {
     .ptr = _ui_state.healthbar.verts, 
-    .size = sizeof(HealthbarVert) * 4 * hbs->to_render_this_frame,
+    .size = (size_t)((int)sizeof(HealthbarVert) * 4 * hbs->to_render_this_frame),
   });
   sg_update_buffer(hbs->ibuf, &(sg_range) {
     .ptr = _ui_state.healthbar.indxs, 
-    .size = sizeof(uint16_t) * 6 * hbs->to_render_this_frame,
+    .size = sizeof(uint16_t) * 6 * (size_t)hbs->to_render_this_frame,
   });
   healthbar_vs_params_t vs_params = { .resolution = { sapp_widthf(), sapp_heightf() } };
   sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_healthbar_vs_params, &SG_RANGE(vs_params));
@@ -501,12 +527,16 @@ static ui_Command *ui_command_next() {
 static void ui_render_healthbar(ol_Rect rect, float hp, ui_HealthbarShape shape) {
   HealthbarState *hbs = &_ui_state.healthbar;
 
-  memcpy(hbs->verts + 4 * hbs->to_render_this_frame, &((HealthbarVert[]) {
-    { rect.x,          rect.y,           0.0f, 0.2f, hp, shape },
-    { rect.x + rect.w, rect.y,           1.0f, 0.2f, hp, shape },
-    { rect.x + rect.w, rect.y + rect.h,  1.0f, 0.0f, hp, shape },
-    { rect.x,          rect.y + rect.h,  0.0f, 0.0f, hp, shape },
-  }), sizeof(HealthbarVert) * 4);
+  float x = (float) rect.x,
+        y = (float) rect.y,
+        w = (float) rect.w,
+        h = (float) rect.h;
+  memcpy(hbs->verts + 4 * hbs->to_render_this_frame, &(HealthbarVert[]) {
+    {{ x,     y,     }, { 0.0f, 0.2f }, hp, shape },
+    {{ x + w, y,     }, { 1.0f, 0.2f }, hp, shape },
+    {{ x + w, y + h, }, { 1.0f, 0.0f }, hp, shape },
+    {{ x,     y + h, }, { 0.0f, 0.0f }, hp, shape },
+ }, sizeof(HealthbarVert) * 4);
 
   uint16_t indices[] = { 0, 1, 2, 2, 3, 0 };
   for (int i = 0; i < 6; i++)
@@ -535,7 +565,7 @@ static void ui_render() {
   for (ui_Command *cmd = ui_command_next(); cmd != NULL; cmd = ui_command_next()) {
     switch (cmd->kind) {
       case Ui_Cmd_Text: {
-        ol_draw_text(&_ui_state.font, cmd->data.text.text, cmd->rect.x, cmd->rect.y, vec4_f(1.0));
+        ol_draw_text(cmd->data.text.font, cmd->data.text.text, cmd->rect.x, cmd->rect.y, vec4_f(1.0));
       } break;
       case Ui_Cmd_Frame: {
         ui_Frame frame = cmd->data.frame.frame;
@@ -558,8 +588,12 @@ static void ui_render() {
 }
 
 static void ui_deinit() {
+  // Remove all fonts and pictures
+  ol_unload_font(&_ui_state.fonts[0]);
+  ol_unload_font(&_ui_state.fonts[1]);
+  ol_unload_font(&_ui_state.fonts[2]);
+  ol_unload_image(&_ui_state.atlas);
 }
 
 // Use ui handle here
-
 

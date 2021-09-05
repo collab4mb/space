@@ -4,15 +4,14 @@ laundry:
 semi-fun:
   make sure that it's not possible to place pillars at very high proximity
   add more animations to build mode
-  make pause menu, it will show some options on the left
 
 fun:
-  save/load functionality
+  # Semi-implemented, current implementation is a stub as it doesn't work well across machines
+  save/load functionality 
   electricity sources
 
 later:
   renderer should be extracted from main, main is currently very big
   relationships between ents
-
 
 

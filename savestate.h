@@ -9,6 +9,7 @@ static bool savestate_save() {
   uint64_t sd_check = (uint64_t) sizeof(Ent);
   uint64_t sd_entcount = STATE_MAX_ENTS;
   uint64_t sd_gems = (uint64_t) state->gem_count;
+  uint64_t sd_tick = (uint64_t) state->tick;
   GenDex sd_player = state->player;
 
   FILE *fh = fopen("savestate.sav", "wb");
@@ -33,6 +34,7 @@ static bool savestate_save() {
   WRITE(sd_check);
   WRITE(sd_entcount);
   WRITE(sd_gems);
+  WRITE(sd_tick);
   WRITE(sd_player);
   WRITE(ents_copy);
 
@@ -48,7 +50,7 @@ static bool savestate_load() {
   // Same as above, additional handling needed
   if (fh == NULL) return false;
 
-  uint64_t sd_check, sd_entcount, sd_gems;
+  uint64_t sd_check, sd_entcount, sd_gems, sd_tick;
   GenDex sd_player;
 
 #define READ(into) fread(&into, sizeof(into), 1, fh)
@@ -65,6 +67,7 @@ static bool savestate_load() {
   }
 
   READ(sd_gems);
+  READ(sd_tick);
   READ(sd_player);
   READ(state->ents);
   // Big bad hack
@@ -72,12 +75,12 @@ static bool savestate_load() {
     if (state->ents[i].ai.state == 0)
       state->ents[i].ai.state = NULL;
     else {
- //     printf("AI id is %zu\n", (size_t)(state->ents[i].ai.state));
       state->ents[i].ai.state = &_ai_state[(size_t)(state->ents[i].ai.state)-1];
     }
   }
 #undef READ
   state->player = sd_player;
+  state->tick = sd_tick;
   state->gem_count = sd_gems; 
 
   fclose(fh);

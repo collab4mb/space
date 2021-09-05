@@ -6,3 +6,4 @@
 -Werror
 -Wconversion
 -Wno-implicit-conversion
+-ferror-limit=0

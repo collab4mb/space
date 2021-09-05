@@ -110,17 +110,20 @@ ol_Image ol_load_image(const char *path) {
 
 #define ATLAS_SIZE 1024
 
-ol_Font ol_load_font(const char *path) {
+ol_Font ol_load_font(const char *path, int font_size) {
   static uint8_t ttf_buffer[1 << 25];
   static uint8_t atlas[1024*1024];
   FILE *f = fopen(path, "rb");
+  assert(f != NULL && "Failed to load font");
+    
   fread(ttf_buffer, 1, 1 << 25, f);
+  fclose(f);
 
   ol_Font font;
   stbtt_fontinfo info;
   int ascent;
   float scale;
-  font.size = 32;
+  font.size = font_size;
 
   stbtt_InitFont(&info, ttf_buffer, 0);
   scale = stbtt_ScaleForPixelHeight(&info, (float)font.size);
@@ -133,6 +136,7 @@ ol_Font ol_load_font(const char *path) {
   assert(stbtt_PackBegin(&context, atlas, ATLAS_SIZE, ATLAS_SIZE, ATLAS_SIZE, 1, NULL) && "Failed to load font");
   stbtt_PackSetOversampling(&context, 2, 2);
   assert(stbtt_PackFontRange(&context, ttf_buffer, 0, (float)font.size, 0, 256, font.pc) && "Failed font packing");
+  stbtt_PackEnd(&context);
   font.img = ol_image_from_sg(sg_make_image(&(sg_image_desc) {
     .pixel_format = SG_PIXELFORMAT_R8,
     .width = ATLAS_SIZE,
@@ -140,6 +144,14 @@ ol_Font ol_load_font(const char *path) {
     .data.subimage[0][0] = (sg_range){atlas, ATLAS_SIZE*ATLAS_SIZE*sizeof(uint8_t)}
   }), ATLAS_SIZE, ATLAS_SIZE);
   return font;
+}
+
+void ol_unload_image(ol_Image *img) {
+  sg_destroy_image(img->sg);
+}
+
+void ol_unload_font(ol_Font *font) {
+  sg_destroy_image(font->img.sg);
 }
 
 void ol_begin() {
@@ -155,8 +167,8 @@ void _ol_draw_tex_part(ol_Image *img, ol_Rect r, ol_Rect part, Vec4 modulate, bo
     .istxt = istxt ? 1.0 : 0.0,
     .minuv = vec2((float)part.x/(float)img->width, (float)part.y/(float)img->height),
     .sizuv = vec2((float)part.w/(float)img->width, (float)part.h/(float)img->height),
-    .pos = vec2(r.x, r.y),
-    .size = vec2(r.w, r.h),
+    .pos = vec2((float)r.x, (float)r.y),
+    .size = vec2((float)r.w, (float)r.h),
     .resolution = vec2(sapp_widthf(), sapp_heightf()),
     .modulate = modulate,
   };

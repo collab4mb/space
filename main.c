@@ -226,8 +226,8 @@ static GenDex get_gendex(Ent *ent) {
   // If you subtract a pointer from a pointer
   // You get an aligned difference, but if the difference is misaligned, UB!!!
   ptrdiff_t offs = (char*)ent-(char*)state->ents;
-  assert((offs >= 0 && offs < sizeof(state->ents)) && "Ent is not present in system");
-  assert(offs % sizeof(Ent) == 0 && "Invalid ent alignment");
+  assert((offs >= 0 && (size_t)offs < sizeof(state->ents)) && "Ent is not present in system");
+  assert((size_t)offs % sizeof(Ent) == 0 && "Invalid ent alignment");
   return (GenDex) { .generation = ent->generation, .index = (size_t)(ent-state->ents)+1 };
 }
 
@@ -269,7 +269,7 @@ static void split_into(int count, Ent ent) {
 }
 
 static void remove_ent(Ent *ent) {
-  if (has_ent_prop(ent, EntProp_AsteroidSplit))
+  if (has_ent_prop(ent, EntProp_AsteroidSplit)) {
     if (ent->collider.size > 0.5f) {
       ent->collider.weight -= 0.3f;
       ent->collider.size -= 0.3f;
@@ -277,7 +277,8 @@ static void remove_ent(Ent *ent) {
       ent->health = 1;
       ent->passive_rotate_axis = rand3();
       split_into(2, *ent);
-    } else
+    } 
+    else 
       split_into(2, (Ent) {
         .props = new_bundle(EntProp_PickUp),
         .pick_up_after_tick = state->tick + 10,
@@ -285,6 +286,7 @@ static void remove_ent(Ent *ent) {
         .pos = ent->pos,
         .bloom = 0.35f,
       });
+  }
   ent->generation++;
   take_ent_prop(ent,EntProp_Active);
 }
@@ -315,7 +317,7 @@ static void fire_laser(Ent *ent) {
     .vel = add2(ent->vel, mul2_f(e_dir, 0.8f)),
     .scale = vec3(1.0f, 1.0f, 3.0f),
     .angle = ent->angle,
-    .height = -0.8,
+    .height = -0.8f,
     .collider.size = 0.2f,
     .collider.weight = 1.0f,
     .damage = ent->damage,
@@ -347,7 +349,7 @@ void load_texture(Art art, const char *texture) {
       .max_anisotropy = 8,
       .wrap_u = SG_WRAP_CLAMP_TO_EDGE,
       .wrap_v = SG_WRAP_CLAMP_TO_EDGE,
-      .data.subimage[0][0] = (sg_range){ player_png.pix,w*h*sizeof(cp_pixel_t) } ,
+      .data.subimage[0][0] = (sg_range){ player_png.pix, (size_t)(w*h)*sizeof(cp_pixel_t) } ,
     });
   else 
     state->meshes[art].texture = sg_make_image(&(sg_image_desc){
@@ -356,7 +358,7 @@ void load_texture(Art art, const char *texture) {
       .max_anisotropy = 8,
       .min_filter = SG_FILTER_LINEAR,
       .mag_filter = SG_FILTER_LINEAR,
-      .data.subimage[0][0] = (sg_range){ player_png.pix, w*h*sizeof(cp_pixel_t) } ,
+      .data.subimage[0][0] = (sg_range){ player_png.pix, (size_t)(w*h)*sizeof(cp_pixel_t) } ,
     });
   cp_free_png(&player_png);
 }
@@ -475,7 +477,7 @@ void init(void) {
     add_ent((Ent) {
       .props = new_bundle(EntProp_PassiveRotate),
       .art = Art_Pillar,
-      .pos = { -1.5 + i * 4.2, 6.5 },
+      .pos = { -1.5f + (float)i * 4.2f, 6.5f },
       .height = 0.0,
       .x_rot = 0,
       .passive_rotate_axis = vec3_y,
@@ -489,14 +491,14 @@ void init(void) {
   for (int r = 0; r < ASTEROID_RINGS; r++)
     for (int i = 0; i < ASTEROIDS_PER_RING; i++) {
       float dist = ASTEROID_FIRST_RING_START_DIST;
-      dist += r*ASTEROID_RING_SPACING;
+      dist += (float)r*ASTEROID_RING_SPACING;
 
       float t = (float)i / (float)ASTEROIDS_PER_RING * PI_f * 2.0f;
-      t += randf() * (PI_f * 2.0f * dist) / (float) ASTEROIDS_PER_RING * 0.8;
+      t += randf() * (PI_f * 2.0f * dist) / (float) ASTEROIDS_PER_RING * 0.8f;
 
       dist += ASTEROID_DIST_RANDOMIZER * (0.5f - randf()) * 2.0f;
 
-      float size = 1.0 + r * (0.1f + 0.2f * randf());
+      float size = 1.0f + (float) r * (0.1f + 0.2f * randf());
       add_ent((Ent) {
         .props = bundle_prop(EntProp_AsteroidSplit,
                  bundle_prop(EntProp_PassiveRotate,
@@ -613,8 +615,8 @@ void init(void) {
 }
 
 static float ent_health_frac(Ent *ent) {
-  float t = (state->tick - ent->last_hit) / 30.0f;
-  return lerp(ent->health+1, ent->health, fminf(1, t)) / fmaxf(ent->max_hp, 1);
+  float t = (float)(state->tick - ent->last_hit) / 30.0f;
+  return lerp((float)(ent->health+1), (float)ent->health, fminf(1, t)) / fmaxf((float)ent->max_hp, 1);
 }
 
 static Mat4 ent_model_mat(Ent *ent) {
@@ -656,7 +658,7 @@ static void draw_ent_internal(Mat4 vp, Ent *ent) {
   if (mesh->shader == Shader_ForceField) {
     force_field_fs_params_t fs_params = {
       .stretch = { ent->scale.y, ent->scale.x },
-      .time = (state->tick - ent->last_collision) / 600.0f,
+      .time = (float)(state->tick - ent->last_collision) / 600.0f,
     };
     sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_force_field_fs_params, &SG_RANGE(fs_params));
   } else if (mesh->shader == Shader_Standard) {
@@ -669,7 +671,7 @@ static void draw_ent_internal(Mat4 vp, Ent *ent) {
   vs_params_t vs_params = { .view_proj = vp, .model = m };
   sg_apply_uniforms(SG_SHADERSTAGE_VS, SLOT_vs_params, &SG_RANGE(vs_params));
 
-  sg_draw(0, mesh->index_count, 1);
+  sg_draw(0, (int)mesh->index_count, 1);
 }
 
 static void draw_ent(Mat4 vp, Ent *ent) {
@@ -710,7 +712,7 @@ static void tick(void) {
     collision_movement_update(ent);
 
     if (has_ent_prop(ent, EntProp_PickUp)) {
-      ent->height = sinf(ent->pos.x + ent->pos.y + (float) state->tick / 14.0) * 0.3f;
+      ent->height = sinf(ent->pos.x + ent->pos.y + (float) state->tick / 14.0f) * 0.3f;
       Ent *p = try_gendex(state->player);
       if (p!=NULL&&ent->pick_up_after_tick <= state->tick) {
 
@@ -749,7 +751,7 @@ static void frame(void) {
   Mat4 proj = perspective4x4(1.047f, w/h, 0.01f, 100.0f);
 
   static float cam_angle = 0.0f;
-  cam_angle = lerp(cam_angle, try_gendex(state->player)->angle, 0.08);
+  cam_angle = lerp(cam_angle, try_gendex(state->player)->angle, 0.08f);
   Vec2 cam_dir = vec2_swap(vec2_rot(cam_angle));
 
   Vec3 plr_p = {try_gendex(state->player)->pos.x, 0.0f, try_gendex(state->player)->pos.y};
@@ -765,7 +767,7 @@ static void frame(void) {
   sg_begin_pass(state->offscreen.pass, &(sg_pass_action) {
     .colors[0] = {
       .action = SG_ACTION_CLEAR,
-      .value = { 0.25f/20.0, 0.25f/20.0, 0.75f/20.0, 1.0f }
+      .value = { 0.25f/20.0f, 0.25f/20.0f, 0.75f/20.0f, 1.0f }
     },
     .colors[1] = { .action = SG_ACTION_CLEAR, .value = { 0.0f, 0.0f, 0.0f, 1.0f } }
   });
@@ -778,7 +780,7 @@ static void frame(void) {
         draw_ent(vp, ent);
   }
 
-  build_update((float)elapsed/1000.0);
+  build_update((float)elapsed/1000.0f);
 
   float plr_hp = 0.0;
   Ent *plr = try_gendex(state->player);
@@ -792,7 +794,7 @@ static void frame(void) {
   
  
   ui_screen((int)w, (int)h);
-    ui_screen_anchor_xy(0.98, 0.02);
+    ui_screen_anchor_xy(0.98f, 0.02f);
     ui_column(250, 0);
       ui_healthbar(250, 50, plr_hp, ui_HealthbarShape_Fancy);
 
@@ -813,19 +815,19 @@ static void frame(void) {
         ui_row_end();
       ui_screen_end();
     ui_column_end();
-    ui_screen_anchor_xy(0.02, 0.02);
+    ui_screen_anchor_xy(0.02f, 0.02f);
     ui_textf("FPS: %.0lf", round(1000/elapsed));
     // Pause menu
       ui_screen_anchor_xy(0.0, 0.5);
       ui_column(0, 200);
-        ui_setoffset(easeinout(-300, 20.0, fmaxf(fminf(state->pause_anim+0.4f, 1.0f), 0.0f)), 0);
+        ui_setoffset((int)easeinout(-300, 20.0f, fmaxf(fminf(state->pause_anim+0.4f, 1.0f), 0.0f)), 0);
         if (ui_button("Resume")) {
           state->pause_message = NULL;
           state->pause_anim = fmaxf(fminf(state->pause_anim, 1.0f), 0.0f);
           state->paused = false;
         }
         ui_gap(10);
-        ui_setoffset(easeinout(-300, 20.0, fmaxf(fminf(state->pause_anim+0.2f, 1.0f), 0.0f)), 0);
+        ui_setoffset((int)easeinout(-300, 20.0f, fmaxf(fminf(state->pause_anim+0.2f, 1.0f), 0.0f)), 0);
         if (ui_button("Save")) {
           state->pause_message = "Saved into savestate.sav";
           if (!savestate_save()) {
@@ -833,7 +835,7 @@ static void frame(void) {
           }
         }
         ui_gap(10);
-        ui_setoffset(easeinout(-300, 20.0, fmaxf(fminf(state->pause_anim+0.1f, 1.0f), 0.0f)), 0);
+        ui_setoffset((int)easeinout(-300, 20.0f, fmaxf(fminf(state->pause_anim+0.1f, 1.0f), 0.0f)), 0);
         if (ui_button("Load")) {
           state->pause_message = "Loaded savestate.sav";
           if (!savestate_load()) {
@@ -841,22 +843,22 @@ static void frame(void) {
           }
         }
         ui_gap(10);
-        ui_setoffset(easeinout(-300, 20.0, fmaxf(fminf(state->pause_anim, 1.0f), 0.0f)), 0);
+        ui_setoffset((int)easeinout(-300, 20.0f, fmaxf(fminf(state->pause_anim, 1.0f), 0.0f)), 0);
         if (ui_button("Exit")) {
           sapp_request_quit();
         }
         ui_setoffset(0, 0);
       ui_column_end();
-      ui_screen_anchor_xy(0.02, 0.98);
+      ui_screen_anchor_xy(0.02f, 0.98f);
       if (state->pause_message) {
         ui_text(state->pause_message);
       }
     //
     if (state->paused) {
-      state->pause_anim += elapsed/1000.0;
+      state->pause_anim += (float)elapsed/1000.0f;
     }
     else {
-      state->pause_anim -= elapsed/1000.0;
+      state->pause_anim -= (float)elapsed/1000.0f;
     }
   ui_screen_end();
 
@@ -872,8 +874,8 @@ static void frame(void) {
       v.y = (v.y + 1.0f)/2.0f * sapp_heightf();
       v.y = sapp_heightf() - v.y;
       ui_render_healthbar((ol_Rect) {
-        .x = roundf(v.x) - 70/2,
-        .y = roundf(v.y) - 14/2,
+        .x = (int)roundf(v.x) - 35,
+        .y = (int)roundf(v.y) - 7,
         .w = 70,
         .h = 14,
       }, ent_health_frac(ent), ui_HealthbarShape_Minimal);
@@ -894,7 +896,7 @@ static void frame(void) {
           [SLOT_tex] = hori ? state->blur.imgs[i][!hori] : state->offscreen.bright_img
         }
       });
-      blur_fs_params_t fs_params = { .hori = vec2(hori, !hori) };
+      blur_fs_params_t fs_params = { .hori = vec2((float)hori, (float)!hori) };
       sg_apply_uniforms(SG_SHADERSTAGE_FS, SLOT_blur_fs_params, &SG_RANGE(fs_params));
       sg_draw(0, 4, 1);
       sg_end_pass();
@@ -924,6 +926,11 @@ static void frame(void) {
 }
 
 static void cleanup(void) {
+  for (size_t i = 0; i < Art_COUNT; i += 1) 
+    sg_destroy_image(state->meshes[i].texture);
+  free(state);
+  ol_unload_image(&gem_image);
+  ui_deinit();
   sg_shutdown();
 }
 
