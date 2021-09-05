@@ -200,6 +200,22 @@ typedef struct {
   size_t index_count;
 } Mesh;
 
+typedef struct {
+  /* the index of the actual Ent this CamEnt corresponds to */
+  size_t index;
+  /* its distance from the camera */
+  float cam_dist;
+} CamEnt;
+
+/* Function to be passed to qsort to aid in sorting entities
+ * based on their distance from the camera */
+static int cam_ent_cmp(const void *av, const void *bv) {
+  float af = ((CamEnt *) av)->cam_dist;
+  float bf = ((CamEnt *) bv)->cam_dist;
+
+  return (af < bf) - (af > bf);
+}
+
 #define OFFSCREEN_SAMPLE_COUNT (4)
 #define STATE_MAX_ENTS (1 << 12)
 #define BLUR_PASSES (4)
@@ -207,6 +223,7 @@ typedef struct {
   sg_pipeline pip[Shader_COUNT];
   Mesh meshes[Art_COUNT];
   Ent ents[STATE_MAX_ENTS];
+  CamEnt cam_ents[STATE_MAX_ENTS];
   GenDex player;
   float player_turn_accel;
   size_t gem_count;
@@ -259,7 +276,7 @@ static void split_into(int count, Ent ent) {
 }
 
 static void remove_ent(Ent *ent) {
-  if (has_ent_prop(ent, EntProp_AsteroidSplit))
+  if (has_ent_prop(ent, EntProp_AsteroidSplit)) {
     if (ent->collider.size > 0.5f) {
       ent->collider.weight -= 0.3f;
       ent->collider.size -= 0.3f;
@@ -267,7 +284,7 @@ static void remove_ent(Ent *ent) {
       ent->health = 1;
       ent->passive_rotate_axis = rand3();
       split_into(2, *ent);
-    } else
+    } else {
       split_into(2, (Ent) {
         .props = new_bundle(EntProp_PickUp),
         .pick_up_after_tick = state->tick + 10,
@@ -275,6 +292,8 @@ static void remove_ent(Ent *ent) {
         .pos = ent->pos,
         .bloom = 0.35f,
       });
+    }
+  }
   ent->generation++;
   take_ent_prop(ent,EntProp_Active);
 }
@@ -285,13 +304,9 @@ static void remove_ent(Ent *ent) {
             draw_ent(e);
 */
 static inline Ent *ent_all_iter(Ent *ent) {
-  if (ent == NULL) ent = state->ents - 1;
-
-  while (!has_ent_prop((++ent), EntProp_Active))
-    if ((ent - state->ents) == STATE_MAX_ENTS)
-      return NULL;
-
-  if (has_ent_prop(ent, EntProp_Active)) return ent;
+  ent = ent ? (ent+1) : state->ents;
+  for (; ent < state->ents + STATE_MAX_ENTS; ent++)
+    if (has_ent_prop(ent, EntProp_Active)) return ent;
   return NULL;
 }
 
@@ -740,11 +755,12 @@ static void frame(void) {
   cam_angle = lerp(cam_angle, state->player.index->angle, 0.08);
   Vec2 cam_dir = vec2_swap(vec2_rot(cam_angle));
 
-  Vec3 plr_p = {state->player.index->pos.x, 0.0f, state->player.index->pos.y};
-  Vec3 cam_o = {           cam_dir.x, 1.0f,          cam_dir.y};
+  Vec3 plr_p, cam_o, cam_eye;
+  plr_p = (Vec3) {state->player.index->pos.x, 0.0f, state->player.index->pos.y};
+  cam_o = (Vec3) {           cam_dir.x, 1.0f,          cam_dir.y};
   Mat4 view = look_at4x4(
-    add3(plr_p, mul3(vec3(-5,  3, -5), cam_o)),
-    add3(plr_p, mul3(vec3( 5,  0,  5), cam_o)),
+    cam_eye = add3(plr_p, mul3(vec3(-5,  3, -5), cam_o)),
+              add3(plr_p, mul3(vec3( 5,  0,  5), cam_o)),
     vec3_y
   );
 
@@ -759,13 +775,26 @@ static void frame(void) {
   });
 
 
-  for (Shader shd = 0; shd < Shader_COUNT; shd++) {
-    sg_apply_pipeline(state->pip[shd]);
-    for (Ent *ent = 0; (ent = ent_all_iter(ent));)
-      if (state->meshes[ent->art].shader == shd)
-        draw_ent(vp, ent);
+  int cam_ent_count = 0;
+  for (Ent *ent = 0; (ent = ent_all_iter(ent));) {
+    Vec3 p = { ent->pos.x, ent->height, ent->pos.y };
+    state->cam_ents[cam_ent_count++] = (CamEnt) {
+      .index = ent - state->ents,
+      .cam_dist = magmag3(sub3(p, cam_eye)),
+    };
   }
+  qsort(state->cam_ents, cam_ent_count, sizeof(CamEnt), cam_ent_cmp);
 
+  Shader shd = -1;
+  for (int i = 0; i < cam_ent_count; i++) {
+    Ent *ent = state->ents + state->cam_ents[i].index;
+    Shader ent_shd = state->meshes[ent->art].shader;
+    if (ent_shd != shd) {
+      shd = ent_shd;
+      sg_apply_pipeline(state->pip[shd]);
+    }
+    draw_ent(vp, ent);
+  }
 
   float plr_hp = 0.0;
   Ent *plr = try_gendex(state->player);
