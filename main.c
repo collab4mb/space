@@ -332,6 +332,7 @@ ol_Image gem_image;
 #include "player.h"
 #include "ai.h"
 #include "savestate.h"
+#include "graphview.h"
 
 void load_texture(Art art, const char *texture) {
   cp_image_t player_png = cp_load_png(texture);
@@ -732,6 +733,7 @@ static void tick(void) {
             ent->pos,
             mul2_f(norm2(delta), (SUCK_DIST - dist) / 20.0f)
           );
+        #undef SUCK_DIST
       }
     }
   }
@@ -865,6 +867,9 @@ static void frame(void) {
 
   build_draw();
 
+  graphview_State graph = graphview_init();
+  graphview_draw(&graph);
+
   ui_render();
   for (Ent *ent = 0; (ent = ent_all_iter(ent));)
     if (has_ent_prop(ent,EntProp_HasAI) && ent->health < ent->max_hp) {
@@ -960,9 +965,15 @@ static void event(const sapp_event *ev) {
       input_key_update(ev->key_code,0);
     } break;
     case SAPP_EVENTTYPE_MOUSE_DOWN: {
+      fire_laser(try_gendex(state->player));
+      fire_laser(try_gendex(state->player));
+      fire_laser(try_gendex(state->player));
       input_mouse_update(ev->mouse_button,1);
     } break;
     case SAPP_EVENTTYPE_MOUSE_UP: {
+      fire_laser(try_gendex(state->player));
+      fire_laser(try_gendex(state->player));
+      fire_laser(try_gendex(state->player));
       input_mouse_update(ev->mouse_button,0);
     } break;
     case SAPP_EVENTTYPE_RESIZED: {

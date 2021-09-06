@@ -238,7 +238,7 @@ static void _build_sidebar() {
       ui_screen(ui_rel_x(1.0), 50);
         ui_frame(ui_rel_x(1.0), ui_rel_y(1.0), ui_Frame_Square);
         ui_margin(14);
-        ui_prompt(&_build_state.search, ui_rel_x(1.0));
+        ui_prompt(&_build_state.search, ui_rel_x(1.0), ui_rel_y(1.0));
       ui_screen_end(0);
       ui_row(ui_rel_x(1.0), ui_rel_y(1.0));
         for (size_t i = 0; i < _build_Option_COUNT; i += 1) {

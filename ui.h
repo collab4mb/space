@@ -20,7 +20,10 @@ const Vec4 ui_Frame_color[ui_Frame_COUNT] = {
    [ui_Frame_HexSelected] = {{ 3.0f, 0.8f, 0.8f, 1.0f }},
 };
 
-typedef enum { ui_HealthbarShape_Minimal, ui_HealthbarShape_Fancy } ui_HealthbarShape;
+typedef enum {
+  ui_HealthbarShape_Minimal,
+  ui_HealthbarShape_Fancy
+} ui_HealthbarShape;
 
 typedef struct {
   enum { 
@@ -28,6 +31,8 @@ typedef struct {
     Ui_Cmd_Image,
     Ui_Cmd_Text,
   } kind;
+  bool clipped;
+  ol_Rect clip;
   ol_Rect rect;
   union {
     struct {
@@ -60,6 +65,11 @@ typedef struct {
 } ui_Screen;
 
 typedef struct {
+  int x;
+  int y;
+} ui_Freeform;
+
+typedef struct {
   int offset;
 } ui_Column;
 
@@ -70,7 +80,9 @@ typedef struct {
 typedef enum {
   Ui_Layout_Screen,
   Ui_Layout_Column,
-  Ui_Layout_Row
+  Ui_Layout_Row,
+  // You are free to position things anywhere
+  Ui_Layout_Freeform
 } ui_LayoutKind;
 
 typedef struct {
@@ -81,6 +93,7 @@ typedef struct {
     ui_Screen screen;
     ui_Column column;
     ui_Row row;
+    ui_Freeform freeform;
   } data;
 } ui_Layout;
 
@@ -116,7 +129,10 @@ typedef struct {
   ol_Font *font;
   ol_Image atlas;
   Vec4 modulate;
-  
+ 
+  ol_Rect clipbuf[32];
+  size_t clip_count;
+
   // Cheap continous text buffer, reset after ui_end
   char textbuf[TEXBUF_SIZE];
   size_t textbuf_offs;
@@ -134,6 +150,7 @@ typedef struct {
   int offset_x, offset_y;
   HealthbarState healthbar;
   int mx, my;
+
 } ui_State;
 
 static ui_State _ui_state;
@@ -228,8 +245,6 @@ static bool ui_event(const sapp_event *ev) {
       ev->type == SAPP_EVENTTYPE_KEY_DOWN) {
     if (ev->key_code == SAPP_KEYCODE_BACKSPACE) 
       ui_erase();
-    if (ev->key_code == SAPP_KEYCODE_LEFT) 
-      ui_erase();
     if (ev->key_code == SAPP_KEYCODE_ESCAPE) 
       // Unfocus
       _ui_state.active_prompt = NULL;
@@ -268,6 +283,10 @@ static ol_Rect _ui_query_bounds(int width, int height) {
     case Ui_Layout_Screen:
       rect.x = (int)(curr->data.screen.anchor_x*(float)curr->bounds.w-curr->data.screen.anchor_x*(float)width); 
       rect.y = (int)(curr->data.screen.anchor_y*(float)curr->bounds.h-curr->data.screen.anchor_y*(float)height);
+      break;
+    case Ui_Layout_Freeform:
+      rect.x = curr->data.freeform.x; 
+      rect.y = curr->data.freeform.y;
       break;
     case Ui_Layout_Column:
       rect.y += curr->data.column.offset;
@@ -313,10 +332,6 @@ static void ui_screen(int width, int height) {
   ui_Layout layout = { 
     .kind = Ui_Layout_Screen,
     .bounds = _ui_query_bounds(width, height),
-    .data.screen = (ui_Screen) {
-      .anchor_x = 0,
-      .anchor_y = 0,
-    }
   };
   layout.measure = layout.bounds;
   *_ui_addlayout() = layout;
@@ -325,6 +340,30 @@ static void ui_screen(int width, int height) {
 
 static ol_Rect ui_screen_end() {
   assert(_ui_state.layouts[_ui_state.layout_count-1].kind == Ui_Layout_Screen && "Called end_screen with previous layout not being a screen");
+  ol_Rect r = _ui_getlayout(0)->measure;
+  _ui_state.layout_count -= 1;
+  return r;
+}
+
+static void ui_freeform(int width, int height) {
+  ui_Layout layout = { 
+    .kind = Ui_Layout_Freeform,
+    .bounds = _ui_query_bounds(width, height),
+  };
+  layout.measure = layout.bounds;
+  *_ui_addlayout() = layout;
+  _ui_state.layout_count += 1;
+}
+
+
+static void ui_freeform_at(int x, int y) {
+  assert(_ui_getlayout(0)->kind == Ui_Layout_Freeform && "Called ui_freeform_at with previous layout not being a freeform");
+  _ui_getlayout(0)->data.freeform.x = x;
+  _ui_getlayout(0)->data.freeform.y = y;
+}
+
+static ol_Rect ui_freeform_end() {
+  assert(_ui_state.layouts[_ui_state.layout_count-1].kind == Ui_Layout_Freeform && "Called end_freeform with previous layout not being a freeform");
   ol_Rect r = _ui_getlayout(0)->measure;
   _ui_state.layout_count -= 1;
   return r;
@@ -372,17 +411,17 @@ static ol_Rect ui_row_end() {
 
 // Pass in a value between 0 and 1, where 0 is the leftmost position, and 1 is the rightmost
 static void ui_screen_anchor_x(float anchor) {
-  assert(_ui_getlayout(0)->kind == Ui_Layout_Screen && "Called end_screen with previous layout not being a screen");
+  assert(_ui_getlayout(0)->kind == Ui_Layout_Screen && "Called screen_anchor_x with previous layout not being a screen");
   _ui_getlayout(0)->data.screen.anchor_x = anchor;
 }
 
 static void ui_screen_anchor_y(float anchor) {
-  assert(_ui_getlayout(0)->kind == Ui_Layout_Screen && "Called end_screen with previous layout not being a screen");
+  assert(_ui_getlayout(0)->kind == Ui_Layout_Screen && "Called screen_anchor_y with previous layout not being a screen");
   _ui_getlayout(0)->data.screen.anchor_y = anchor;
 }
 
 static void ui_screen_anchor_xy(float anchorx, float anchory) {
-  assert(_ui_getlayout(0)->kind == Ui_Layout_Screen && "Called end_screen with previous layout not being a screen");
+  assert(_ui_getlayout(0)->kind == Ui_Layout_Screen && "Called screen_anchor_xy with previous layout not being a screen");
   _ui_getlayout(0)->data.screen.anchor_x = anchorx;
   _ui_getlayout(0)->data.screen.anchor_y = anchory;
 }
@@ -396,6 +435,10 @@ static int ui_rel_y(float mul) {
 }
 
 static void ui_addcommand(ui_Command cmd) {
+  if (_ui_state.clip_count > 0) {
+    cmd.clipped = true;
+    cmd.clip = _ui_state.clipbuf[_ui_state.clip_count-1];
+  }
   cmd.rect.x += _ui_state.offset_x;
   cmd.rect.y += _ui_state.offset_y;
   if (_ui_state.measuremode_counter == 0) {
@@ -487,6 +530,18 @@ static bool _ui_checkrect(ol_Rect bounds) {
   return 
     _ui_state.mx >= bounds.x && _ui_state.mx <= (bounds.x+bounds.w) &&
     _ui_state.my >= bounds.y && _ui_state.my <= (bounds.y+bounds.h);
+}
+
+static void ui_clip(ol_Rect rect) {
+  // For now just sets clipping region field
+  assert(_ui_state.clip_count < 32 && "Clip limit exceeded");
+  _ui_state.clipbuf[_ui_state.clip_count++] = rect;
+}
+
+
+static void ui_unclip() {
+  assert(_ui_state.clip_count > 0 && "Clip stack underflow");
+  _ui_state.clip_count -= 1;
 }
 
 static bool ui_frame(int width, int height, ui_Frame frame) {
@@ -605,8 +660,11 @@ static bool ui_button(const char *text) {
 // live until active_prompt is assigned to another value
 // or longer. Height will equal to the size of the font.
 // 
-static void ui_prompt(ui_Prompt *prompt, int xlimit) {
-  ui_screen(xlimit, _ui_state.font->size);
+static void ui_prompt(ui_Prompt *prompt, int width, int height) {
+  ui_screen(width, height);
+    ol_Rect bounds = _ui_query_bounds(ui_rel_x(1.0), ui_rel_y(1.0));
+    ui_screen_anchor_xy(0.0, 0.5);
+    ui_clip(bounds);
     // Blink blink
     // Every 20th tick will swap between shown and hidden
     if (_ui_state.active_prompt == prompt && (state->tick / 20) % 2 == 0) 
@@ -614,7 +672,7 @@ static void ui_prompt(ui_Prompt *prompt, int xlimit) {
       ui_textf("%s|", prompt->input);
     else 
       ui_textf("%s", prompt->input);
-    ol_Rect bounds = _ui_query_bounds(xlimit, _ui_state.font->size);
+    ui_unclip();
   ui_screen_end();
   // Check if input field has been pressed
   if (input_mouse_down(0) && _ui_checkrect(bounds)) {
@@ -625,9 +683,20 @@ static void ui_prompt(ui_Prompt *prompt, int xlimit) {
 
 static void ui_render() {
   for (ui_Command *cmd = ui_command_next(); cmd != NULL; cmd = ui_command_next()) {
+    if (cmd->clipped) 
+      sg_apply_scissor_rect(cmd->clip.x, cmd->clip.y, cmd->clip.w, cmd->clip.h, true);
+    else 
+      sg_apply_scissor_rect(0, 0, sapp_width(), sapp_height(), true);
+    
     switch (cmd->kind) {
       case Ui_Cmd_Text: {
-        ol_draw_text(cmd->data.text.font, cmd->data.text.text, cmd->rect.x, cmd->rect.y, vec4_f(1.0));
+        ol_draw_text(
+          cmd->data.text.font,
+          cmd->data.text.text,
+          cmd->rect.x,
+          cmd->rect.y,
+          vec4_f(1.0f)
+        );
       } break;
       case Ui_Cmd_Frame: {
         ui_Frame frame = cmd->data.frame.frame;
