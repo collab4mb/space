@@ -13,7 +13,7 @@ On Windows, run `bake.bat` and then `build/main.exe`.
 # Bikeshedding
 ### Casing
 Functions and variables are `snake_case`.
-Structs and Enums are `CamelCase`d, and `typedef`ed such that you do `MyStruct`, not `struct MyStruct`.
+Structs and Enums are `PascalCase`d, and `typedef`ed such that you do `MyStruct`, not `struct MyStruct`.
 ### Namespacing
 Prefer [unity builds (aka jumbo builds)](https://en.wikipedia.org/wiki/Unity_build) where possible.
 
