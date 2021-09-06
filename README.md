@@ -2,7 +2,11 @@
 In Space Game, you maneuver a 3D space ship across a 2D plane. Waves of other ships will periodically arrive to attack you. To help ward them off, you can construct walls and other defenses using materials harvested from stray asteroids and defeated enemies.
 
 # To run
-On Linux, `sudo apt-get install libgl-dev libx11-dev libxi-dev libxcursor-dev` and then run `./bake && build/a.out` in the project root.
+## Linux
+Some dev packages for opening X11 windows and using OpenGL are necessary.
+You can grab all of them with `sudo apt-get install libgl-dev libx11-dev libxi-dev libxcursor-dev`.
+You should only need to download them once. Afterwards, to build and run the project, run `./bake && build/a.out` in the project root.
+## Windows
 On Windows, run `bake.bat` and then `build/main.exe`.
 
 
