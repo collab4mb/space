@@ -1,17 +1,21 @@
 # Space Game
 In Space Game, you maneuver a 3D space ship across a 2D plane. Waves of other ships will periodically arrive to attack you. To help ward them off, you can construct walls and other defenses using materials harvested from stray asteroids and defeated enemies.
 
+# To run
+On Linux, `sudo apt-get install libgl-dev libx11-dev libxi-dev libxcursor-dev` and then run `./bake && build/a.out` in the project root.
+On Windows, run `bake.bat` and then `build/main.exe`.
 
-# Bike-shedding
+
+# Bikeshedding
 ## Casing
 Functions and variables are `snake_case`.
 Structs and Enums are `CamelCase`d, and `typedef`ed such that you do `MyStruct`, not `struct MyStruct`.
-## Name-spacing
+## Namespacing
 Prefer [unity builds (aka jumbo builds)](https://en.wikipedia.org/wiki/Unity_build) where possible.
 
 The entry point of the program is `main.c`; all other files are `.h` files which are `#include`d into `main.c`.
 
-Inside of unity build headers, name-space with a prefix that matches the name of the `.h` file. Functions private to this header should be prefixed again with `_`, such that if your file is `mapgen.h`, the private function `simplex_noise` becomes `_mapgen_simplex_noise`.
+Inside of unity build headers, namespace with a prefix that matches the name of the `.h` file. Functions private to this header should be prefixed again with `_`, such that if your file is `mapgen.h`, the private function `simplex_noise` becomes `_mapgen_simplex_noise`.
 ## Spacing
 Configure your editor to emit two spaces when the tab key is pressed. No actual tab characters should be included in any commits.
 ## Syntax
