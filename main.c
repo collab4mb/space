@@ -895,7 +895,8 @@ static void frame(void) {
 
   build_draw();
 
-  graphview_State graph = graphview_init();
+  graphview_State graph;
+  graphview_init(&graph);
   graphview_draw(&graph);
 
   ui_render();
@@ -993,15 +994,9 @@ static void event(const sapp_event *ev) {
       input_key_update(ev->key_code,0);
     } break;
     case SAPP_EVENTTYPE_MOUSE_DOWN: {
-      fire_laser(try_gendex(state->player));
-      fire_laser(try_gendex(state->player));
-      fire_laser(try_gendex(state->player));
       input_mouse_update(ev->mouse_button,1);
     } break;
     case SAPP_EVENTTYPE_MOUSE_UP: {
-      fire_laser(try_gendex(state->player));
-      fire_laser(try_gendex(state->player));
-      fire_laser(try_gendex(state->player));
       input_mouse_update(ev->mouse_button,0);
     } break;
     case SAPP_EVENTTYPE_RESIZED: {

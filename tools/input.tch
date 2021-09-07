@@ -1,0 +1,52 @@
+;         --NAME                  --TIER  --TEXTURE
+(/nodedef Rotating-Barrels-I      1       (0 0 48 48))
+(/nodedef Rotating-Barrels-II     2       (0 0 48 48))
+(/nodedef Rotating-Barrels-III    3       (0 0 48 48))
+(/nodedef Shotgun-I               1       (0 0 48 48))
+(/nodedef Shotgun-II              2       (0 0 48 48))
+(/nodedef Targeting-Computer-I    1       (0 0 48 48))
+(/nodedef Targeting-Computer-II   2       (0 0 48 48))
+(/nodedef Magnet-Core-I           1       (0 0 48 48))
+(/nodedef Magnet-Core-II          2       (0 0 48 48))
+(/nodedef Polarity-Enhancers-I    1       (0 0 48 48))
+(/nodedef Crystal-Midas-I         1       (0 0 48 48))
+(/nodedef Projectile-Payload-I    1       (0 0 48 48))
+(/nodedef Projectile-Payload-II   2       (0 0 48 48))
+(/nodedef Projectile-Payload-III  3       (0 0 48 48))
+(/nodedef Homing-Projectiles-I    1       (0 0 48 48))
+(/nodedef Builder-I               1       (0 0 48 48))
+(/nodedef Builder-II              2       (0 0 48 48))
+(/nodedef Forceful-I              1       (0 0 48 48))
+(/nodedef Forceful-II             2       (0 0 48 48))
+(/nodedef Bouncy-I                1       (0 0 48 48))
+(/nodedef Targeting-Computer-II   2       (0 0 48 48))
+
+(Rotating-Barrels-I
+  (Rotating-Barrels-II
+    (Shotgun-I
+      Shotgun-II)
+    Rotating-Barrels-III))
+
+(/join (Shotgun-II Rotating-Barrels-III)
+  Targeting-Computer-I)
+
+(Magnet-Core-I
+  Polarity-Enhancers-I
+  (Magnet-Core-II
+    Crystal-Midas-I
+    Magnet-Core-II))
+
+(/join (Magnet-Core-II Rotating-Barrels-III)
+  (Projectile-Payload-I
+    (Projectile-Payload-II
+      Homing-Projectiles-I
+      Projectile Payload-III)))
+
+(Builder-I
+  (Forceful-I
+    (Forceful-II
+      Bouncy-I))
+  Builder-II)
+
+(/join (Builder-II Targeting-Computer-I)
+  Targeting-Computer-II)
