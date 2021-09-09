@@ -1,3 +1,7 @@
+#|-----------------------
+  Tech tree destcription
+  -----------------------|#
+
 ;         --NAME                  --TIER  --TEXTURE
 (/nodedef Rotating-Barrels-I      1       (0 0 48 48))
 (/nodedef Rotating-Barrels-II     2       (0 0 48 48))
@@ -8,6 +12,7 @@
 (/nodedef Targeting-Computer-II   2       (0 0 48 48))
 (/nodedef Magnet-Core-I           1       (0 0 48 48))
 (/nodedef Magnet-Core-II          2       (0 0 48 48))
+(/nodedef Magnet-Core-III         3       (0 0 48 48))
 (/nodedef Polarity-Enhancers-I    1       (0 0 48 48))
 (/nodedef Crystal-Midas-I         1       (0 0 48 48))
 (/nodedef Projectile-Payload-I    1       (0 0 48 48))
@@ -19,7 +24,6 @@
 (/nodedef Forceful-I              1       (0 0 48 48))
 (/nodedef Forceful-II             2       (0 0 48 48))
 (/nodedef Bouncy-I                1       (0 0 48 48))
-(/nodedef Targeting-Computer-II   2       (0 0 48 48))
 
 (Rotating-Barrels-I
   (Rotating-Barrels-II
@@ -34,13 +38,13 @@
   Polarity-Enhancers-I
   (Magnet-Core-II
     Crystal-Midas-I
-    Magnet-Core-II))
+    Magnet-Core-III))
 
-(/join (Magnet-Core-II Rotating-Barrels-III)
+(/join (Rotating-Barrels-III Magnet-Core-II)
   (Projectile-Payload-I
     (Projectile-Payload-II
       Homing-Projectiles-I
-      Projectile Payload-III)))
+      Projectile-Payload-III)))
 
 (Builder-I
   (Forceful-I

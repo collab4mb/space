@@ -346,6 +346,7 @@ ol_Image gem_image;
 #include "ai.h"
 #include "savestate.h"
 #include "graphview.h"
+#include "generated_tree.h"
 
 void load_texture(Art art, const char *texture) {
   cp_image_t player_png = cp_load_png(texture);
@@ -883,7 +884,6 @@ static void frame(void) {
       if (state->pause_message) {
         ui_text(state->pause_message);
       }
-    //
     if (state->paused) {
       state->pause_anim += (float)elapsed/1000.0f;
     }
@@ -895,8 +895,8 @@ static void frame(void) {
 
   build_draw();
 
-  graphview_State graph;
-  graphview_init(&graph);
+  graphview_State graph = { 0 };
+  treeview_generate_techtree(&graph);
   graphview_draw(&graph);
 
   ui_render();

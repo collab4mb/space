@@ -26,117 +26,22 @@ typedef struct {
   gv(Conn) conns[MAX_CONNS]; 
 } gv(State);
 
-void gv(init)(gv(State) *state) {
-  *state = (gv(State)) { 0 };
-  state->nodes[0] = (gv(Node)) {
-    .present = true,
-    .first_child = &state->nodes[1]
-  };
-  state->nodes[1] = (gv(Node)) {
-    .present = true,
-    .sibling = &state->nodes[2],
-    .first_child = &state->nodes[3]
-  };
-  state->nodes[3] = (gv(Node)) {
-    .sibling = &state->nodes[7],
-    .first_child = &state->nodes[9],
-    .present = true,
-  };
-  state->nodes[2] = (gv(Node)) {
-    .present = true,
-    .sibling = &state->nodes[4]
-  };
-  state->nodes[4] = (gv(Node)) {
-    .present = true,
-    .first_child = &state->nodes[5]
-  };
-  state->nodes[5] = (gv(Node)) {
-    .present = true,
-    .sibling = &state->nodes[6],
-    .first_child = &state->nodes[10]
-  };
-  state->nodes[6] = (gv(Node)) {
-    .sibling = &state->nodes[12],
-    .present = true,
-  };
-  state->nodes[7] = (gv(Node)) {
-    .sibling = &state->nodes[8],
-    .present = true,
-  };
-  state->nodes[8] = (gv(Node)) {
-    .present = true,
-  };
-  state->nodes[9] = (gv(Node)) {
-    .present = true,
-  };
-  state->nodes[10] = (gv(Node)) {
-    .first_child = &state->nodes[11],
-    .present = true,
-  };
-  state->nodes[11] = (gv(Node)) {
-    .first_child = &state->nodes[15],
-    .sibling = &state->nodes[17],
-    .present = true,
-  };
-  state->nodes[16] = (gv(Node)) {
-    .present = true,
-  };
-  state->nodes[17] = (gv(Node)) {
-    .present = true,
-  };
-  state->nodes[15] = (gv(Node)) {
-    .sibling = &state->nodes[16],
-    .present = true,
-  };
-  state->nodes[12] = (gv(Node)) {
-    .first_child = &state->nodes[13], 
-    .present = true,
-  };
-  state->nodes[13] = (gv(Node)) {
-    .sibling = &state->nodes[14], 
-    .present = true,
-  };
-  state->nodes[14] = (gv(Node)) {
-    .present = true,
-  };
-  state->conns[0] = (gv(Conn)) {
-    .present = true,
-    .from = &state->nodes[6],
-    .to = &state->nodes[2],
-  };
-  state->conns[1] = (gv(Conn)) {
-    .present = true,
-    .from = &state->nodes[9],
-    .to = &state->nodes[2],
-  };
-  state->conns[2] = (gv(Conn)) {
-    .present = true,
-    .from = &state->nodes[6],
-    .to = &state->nodes[8],
-  };
-  state->conns[3] = (gv(Conn)) {
-    .present = true,
-    .from = &state->nodes[3],
-    .to = &state->nodes[8],
-  };
-}
-
-int _gv(find_span)(gv(Node) *node) {
+int _gv(find_span)(gv(State) *state, gv(Node) *node) {
   int acc = 0;
   for (gv(Node) *iter = node->first_child; iter; iter = iter->sibling) {
-    acc += _gv(find_span)(iter);
+    acc += _gv(find_span)(state, iter);
   }
   return m_max(acc, DEFAULT_SIZE);
 }
 
-int _gv(find_positions)(gv(Node) *node, size_t depth, int offs) {
-  node->x = (_gv(find_span)(node)-DEFAULT_SIZE)/2+offs;
+int _gv(find_positions)(gv(State) *state, gv(Node) *node, size_t depth, int offs) {
+  node->x = (_gv(find_span)(state, node)-DEFAULT_SIZE)/2+offs;
   node->y = (int)(depth*DEFAULT_SIZE);
   node->depth = depth;
   for (gv(Node) *iter = node->first_child; iter; iter = iter->sibling) {
-    offs += _gv(find_positions)(iter, depth+1, offs);
+    offs += _gv(find_positions)(state, iter, depth+1, offs);
   }
-  return _gv(find_span)(node);
+  return _gv(find_span)(state, node);
 }
 
 void _gv(draw_line)(gv(Node) *from, gv(Node) *to) {
@@ -172,11 +77,19 @@ size_t _gv(squeeze)(gv(State) *state, gv(Node) *from, gv(Node) *to) {
     gv(Node) *node = &state->nodes[i];
     if (!node->present) continue;
     size_t mindep = m_min(from->depth, to->depth);
-    if (node->x > from->x && node->x < to->x && node->depth >= mindep) {
+    if (node->x >= from->x && node->x <= to->x && node->depth >= mindep) {
       max = m_max(node->depth, max);
     }
   }
   return max;
+}
+
+void _gv(propagate_depth)(gv(Node) *node, size_t orig, size_t newd) {
+  for (gv(Node) *iter = node->first_child; iter; iter = iter->sibling) {
+    _gv(propagate_depth)(iter, orig, newd);
+    iter->depth = iter->depth-orig+newd;
+    iter->y = (int)(iter->depth*DEFAULT_SIZE);
+  }
 }
 
 void _gv(relocate_y)(gv(State) *state) {
@@ -184,16 +97,17 @@ void _gv(relocate_y)(gv(State) *state) {
     gv(Conn) *conn = &state->conns[i];
     if (!conn->present) continue;
     
-    if ((conn->from->depth+1) > conn->to->depth)
+    if ((conn->from->depth+1) > conn->to->depth) {
+      size_t orig = conn->to->depth;
       conn->to->depth = _gv(squeeze)(state, conn->from, conn->to)+1;
+      _gv(propagate_depth)(conn->to, orig, conn->to->depth);
+    }
     conn->to->y = (int)(conn->to->depth*DEFAULT_SIZE);
   }
 }
 
-
-
 void gv(draw)(gv(State) *state) {
-  _graphview_find_positions(&state->nodes[0], 0, 0);
+  _graphview_find_positions(state, &state->nodes[0], 0, 0);
   _gv(relocate_y)(state);
   _gv(squeeze)(state, &state->nodes[6], &state->nodes[2]);
   for (size_t i = 0; i < MAX_CONNS; i += 1) {
@@ -203,9 +117,13 @@ void gv(draw)(gv(State) *state) {
   }
   for (size_t i = 0; i < MAX_NODES; i += 1) {
     gv(Node) *node = &state->nodes[i];
-    // doesn't exist
     if (!node->present) continue;
     gv(draw_lines)(node);
+  }
+  for (size_t i = 0; i < MAX_NODES; i += 1) {
+    gv(Node) *node = &state->nodes[i];
+    // doesn't exist
+    if (!node->present) continue;
     char buf[32] = { 0 };
     sprintf(buf, "%zu", i);
     ol_draw_rect(vec4(0.0, 0.0, 1.0, 1.0f), (ol_Rect) {
