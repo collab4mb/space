@@ -339,11 +339,6 @@ size_t evaluate(struct Generator *gen, struct Node *node) {
         for (; requires; requires = requires->sibling) {
           size_t rnid = evaluate(gen, requires);
           for (size_t i = 0; i < id_count; i += 1) {
-            /*
-            if (gen->nodes[rnid].first_child == SIZE_MAX && !gen->nodes[children_ids[i]].has_parent) {
-              gen->nodes[children_ids[i]].has_parent = true;
-              gen->nodes[rnid].first_child = children_ids[i];
-            }*/
             gen->conns[gen->conn_count++] = (struct GraphConn) {
               .from = rnid,
               .to = children_ids[i]
@@ -446,9 +441,14 @@ int main(int argc, char *argv[]) {
     current += sprintf(current, 
         "  /* %.*s */\n"
         "  state->nodes[%zu] = (graphview_Node) {\n"
-        "    .present = true,\n",
-        (int)gen.nodes[i].name.size, gen.nodes[i].name.str,
-        i+1
+        "    .present = true,\n"
+        "    .icon_rect = { %ld, %ld, %ld, %ld },\n"
+        "    .tier = %ld,\n"
+        "    .name = \"%.*s\",\n",
+        (int)gen.nodes[i].name.size, gen.nodes[i].name.str, i+1,
+        gen.nodes[i].tx, gen.nodes[i].ty, gen.nodes[i].tw, gen.nodes[i].th,
+        gen.nodes[i].tier,
+        (int)gen.nodes[i].name.size, gen.nodes[i].name.str
     );
     if (gen.nodes[i].sibling != SIZE_MAX)
       current += sprintf(current, "    .sibling = &state->nodes[%zu],\n", gen.nodes[i].sibling+1);

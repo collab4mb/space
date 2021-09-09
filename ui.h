@@ -30,6 +30,7 @@ typedef struct {
     Ui_Cmd_Frame,
     Ui_Cmd_Image,
     Ui_Cmd_Text,
+    Ui_Cmd_Rect
   } kind;
   bool clipped;
   ol_Rect clip;
@@ -45,6 +46,9 @@ typedef struct {
       ol_Image *img;
       ol_Rect part;
     } image;
+    struct {
+      Vec4 color;
+    } rect;
     struct {
       const char *text;
       ol_Font *font;
@@ -459,7 +463,7 @@ static void ui_resetcolor() {
   _ui_state.modulate = vec4(1.0, 1.0, 1.0, 1.0);
 }
 
-static void ui_text(const char *text) {
+static void _ui_text(const char *text) {
   ol_Rect rect = ol_measure_text(_ui_state.font, text, 0, 0);
   rect = _ui_query_bounds(rect.w, rect.h);
   ui_addcommand((ui_Command) {
@@ -467,6 +471,13 @@ static void ui_text(const char *text) {
     .rect = rect,
     .data.text = { text, _ui_state.font },
   });
+}
+
+static void ui_text(const char *text) {
+  int offs = snprintf(_ui_state.textbuf+_ui_state.textbuf_offs, TEXBUF_SIZE-_ui_state.textbuf_offs, "%s", text);
+  assert(offs >= 0 && "Ui: Invalid offset for format string");
+  _ui_text(_ui_state.textbuf+_ui_state.textbuf_offs);
+  _ui_state.textbuf_offs += (size_t)offs+1;
 }
 
 static void ui_measuremode() {
@@ -556,6 +567,18 @@ static bool ui_frame(int width, int height, ui_Frame frame) {
   return _ui_checkrect(bounds);
 }
 
+static bool ui_rect(Vec4 color, int width, int height) {
+  ol_Rect bounds = _ui_query_bounds(width, height); 
+  ui_addcommand((ui_Command) {
+    .kind = Ui_Cmd_Rect,
+    .rect = bounds,
+    .data.rect = { .color = color }
+  });
+  bounds.x += _ui_state.offset_x;
+  bounds.y += _ui_state.offset_y;
+  return _ui_checkrect(bounds);
+}
+
 static void ui_healthbar(int width, int height, float hp, ui_HealthbarShape shape) {
   ui_addcommand((ui_Command) {
     .kind = Ui_Cmd_Frame,
@@ -567,10 +590,11 @@ static void ui_healthbar(int width, int height, float hp, ui_HealthbarShape shap
 static void ui_vtextf(const char *fmt, va_list vl) {
   // TODO: Add checks
   assert(_ui_state.textbuf_offs < TEXBUF_SIZE && "Text buffer overflow, please print less text, or you forgot to call ui_end_pass after commands");
-  ui_text(_ui_state.textbuf+_ui_state.textbuf_offs);
+  _ui_text(_ui_state.textbuf+_ui_state.textbuf_offs);
   int offs = vsnprintf(_ui_state.textbuf+_ui_state.textbuf_offs, TEXBUF_SIZE-_ui_state.textbuf_offs, fmt, vl);
   assert(offs >= 0 && "Ui: Invalid offset for format string");
   _ui_state.textbuf_offs += (size_t)offs+1;
+
 }
 
 static void ui_textf(const char *fmt, ...) {
@@ -698,6 +722,12 @@ static void ui_render() {
           vec4_f(1.0f)
         );
       } break;
+      case Ui_Cmd_Rect: {
+        ol_draw_rect(
+          cmd->data.rect.color,
+          cmd->rect
+        );
+      } break;
       case Ui_Cmd_Frame: {
         ui_Frame frame = cmd->data.frame.frame;
         if (frame == ui_Frame_Healthbar)
@@ -711,9 +741,6 @@ static void ui_render() {
       case Ui_Cmd_Image: {
         ol_draw_tex_part(cmd->data.image.img, cmd->rect, cmd->data.image.part);
       } break;
-      default: {
-        assert(false);
-      }
     }
   }
 }

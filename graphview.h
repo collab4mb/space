@@ -13,6 +13,10 @@ typedef struct gv(Node) {
   // Size is assumed to be 70, minus margin, 50
   struct gv(Node) *first_child;
   struct gv(Node) *sibling;
+  // Some other data
+  ol_Rect icon_rect;
+  const char *name;
+  int tier;
 } gv(Node);
 
 typedef struct gv(Conn) {
@@ -22,8 +26,12 @@ typedef struct gv(Conn) {
 } gv(Conn);
 
 typedef struct {
+  bool scrolling;
+  int scroll_x, scroll_y;
+  gv(Node) *node_hovered;
   gv(Node) nodes[MAX_NODES]; 
-  gv(Conn) conns[MAX_CONNS]; 
+  gv(Conn) conns[MAX_CONNS];
+  ol_Image atlas;
 } gv(State);
 
 int _gv(find_span)(gv(State) *state, gv(Node) *node) {
@@ -36,7 +44,7 @@ int _gv(find_span)(gv(State) *state, gv(Node) *node) {
 
 int _gv(find_positions)(gv(State) *state, gv(Node) *node, size_t depth, int offs) {
   node->x = (_gv(find_span)(state, node)-DEFAULT_SIZE)/2+offs;
-  node->y = (int)(depth*DEFAULT_SIZE);
+  node->y = ((int)(depth-1)*DEFAULT_SIZE);
   node->depth = depth;
   for (gv(Node) *iter = node->first_child; iter; iter = iter->sibling) {
     offs += _gv(find_positions)(state, iter, depth+1, offs);
@@ -44,23 +52,35 @@ int _gv(find_positions)(gv(State) *state, gv(Node) *node, size_t depth, int offs
   return _gv(find_span)(state, node);
 }
 
-void _gv(draw_line)(gv(Node) *from, gv(Node) *to) {
-  int sx = from->x + DEFAULT_SIZE/2+50;
-  int sy = from->y + DEFAULT_SIZE/2+50;
+void _gv(draw_line)(gv(State) *state, bool inv, gv(Node) *from, gv(Node) *to) {
+  int sx = from->x + DEFAULT_SIZE/2;
+  int sy = from->y + DEFAULT_SIZE/2;
 
-  int dx = to->x + DEFAULT_SIZE/2+50;
-  int dy = to->y + DEFAULT_SIZE/2+50;
+  int dx = to->x + DEFAULT_SIZE/2;
+  int dy = to->y + DEFAULT_SIZE/2;
+
+  Vec4 color = vec4(1.0, 1.0, 1.0, 0.5);
+
+  if ((inv ? to : from) == state->node_hovered) {
+    color = vec4(0.0, 1.0, 0.0, 0.5);
+  }
+  if ((inv ? from : to) == state->node_hovered) {
+    color = vec4(1.0, 0.0, 0.0, 0.5);
+  }
   
+
   int offs = 0;
   if (dy-sy < 0) offs += 2; 
 
-  ol_draw_rect(vec4(1.0, 1.0, 1.0, 1.0), (ol_Rect) { sx-1, sy-1, dx-sx, 2 });
-  ol_draw_rect(vec4(1.0, 1.0, 1.0, 1.0), (ol_Rect) { dx-1, sy-1+offs, 2, dy-sy });
+  ui_freeform_at(sx-1, sy-1);
+  ui_rect(color, dx-sx, 2);
+  ui_freeform_at(dx-1, sy-1+offs);
+  ui_rect(color, 2, dy-sy-offs);
 }
 
-void gv(draw_lines)(gv(Node) *node) {
+void gv(draw_lines)(gv(State) *state, gv(Node) *node) {
   for (gv(Node) *iter = node->first_child; iter; iter = iter->sibling) {
-    _gv(draw_line)(node, iter);
+    _gv(draw_line)(state, false, node, iter);
   }
 }
 
@@ -106,34 +126,89 @@ void _gv(relocate_y)(gv(State) *state) {
   }
 }
 
+bool gv(process_events)(gv(State) *state, const sapp_event *ev) {
+  if (ev->type == SAPP_EVENTTYPE_MOUSE_DOWN && ev->mouse_button == SAPP_MOUSEBUTTON_MIDDLE) {
+    state->scrolling = true;
+  }
+  if (ev->type == SAPP_EVENTTYPE_MOUSE_UP   && ev->mouse_button == SAPP_MOUSEBUTTON_MIDDLE) {
+    state->scrolling = false;
+  }
+  if (ev->type == SAPP_EVENTTYPE_MOUSE_MOVE && state->scrolling) {
+    state->scroll_x += (int)ev->mouse_dx;
+    state->scroll_y += (int)ev->mouse_dy;
+  }
+}
+
+void gv(draw_tooltip)(gv(State) *state) {
+  if (state->node_hovered == NULL) return;
+  struct gv(Node) *node = state->node_hovered;
+  int tooltip_x = node->x+DEFAULT_SIZE;
+  int tooltip_y = node->y;
+  ui_freeform_at(tooltip_x, tooltip_y);
+  ui_button(node->name);
+}
+
+static void _gv(print_roman)(char *dest, int num) {
+  if (num < 0) {
+    *dest++ = '-';
+    num = -num;
+  }
+  // I'm too lazy to actually make a converter...
+  const char *literals[] = {
+    "0",
+    "I",
+    "II",
+    "III",
+    "IV",
+    "V",
+    "VI",
+    "VII",
+    "VIII",
+    "X",
+  };
+  if (num <= 10) strcpy(dest, literals[num]);
+  else sprintf(dest, "%d", num);
+}
+
 void gv(draw)(gv(State) *state) {
   _graphview_find_positions(state, &state->nodes[0], 0, 0);
   _gv(relocate_y)(state);
   _gv(squeeze)(state, &state->nodes[6], &state->nodes[2]);
+  ui_freeform(sapp_width(), sapp_height());
+  ui_freeform_at(state->scroll_x, state->scroll_y);
+  ui_freeform(sapp_width(), sapp_height());
+  bool hit = false;
   for (size_t i = 0; i < MAX_CONNS; i += 1) {
     gv(Conn) *conn = &state->conns[i];
     if (!conn->present) continue;
-    _gv(draw_line)(conn->to, conn->from);
+    _gv(draw_line)(state, true, conn->to, conn->from);
   }
-  for (size_t i = 0; i < MAX_NODES; i += 1) {
+  for (size_t i = 1; i < MAX_NODES; i += 1) {
     gv(Node) *node = &state->nodes[i];
     if (!node->present) continue;
-    gv(draw_lines)(node);
+    gv(draw_lines)(state, node);
   }
-  for (size_t i = 0; i < MAX_NODES; i += 1) {
+  for (size_t i = 1; i < MAX_NODES; i += 1) {
     gv(Node) *node = &state->nodes[i];
-    // doesn't exist
     if (!node->present) continue;
     char buf[32] = { 0 };
-    sprintf(buf, "%zu", i);
-    ol_draw_rect(vec4(0.0, 0.0, 1.0, 1.0f), (ol_Rect) {
-      .x = node->x+5+50,
-      .y = node->y+5+50,
-      .w = DEFAULT_SIZE-10,
-      .h = DEFAULT_SIZE-10
-    });
-    ol_draw_text(_ui_state.font, buf, node->x+5+50, node->y+5+50, vec4(1.0, 1.0, 1.0, 1.0));
+    _gv(print_roman)(buf, node->tier);
+    ui_freeform_at(node->x, node->y);
+    ui_screen(DEFAULT_SIZE, DEFAULT_SIZE);
+      ui_margin(5);
+      if (ui_frame(DEFAULT_SIZE, DEFAULT_SIZE, state->node_hovered == node ? ui_Frame_HexSelected : ui_Frame_Hex)) {
+        state->node_hovered = node;
+        hit = true;
+      }
+      ui_screen_anchor_xy(0.5, 0.5);
+      ui_image_part(&state->atlas, node->icon_rect);
+    ui_screen_end();
   }
+  if (!hit)
+    state->node_hovered = 0;
+  gv(draw_tooltip)(state);
+  ui_freeform_end();
+  ui_freeform_end();
 }
 
 #undef gv

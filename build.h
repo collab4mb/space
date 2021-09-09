@@ -288,5 +288,6 @@ static void build_draw() {
       ui_text(_build_options[self.tooltip].tooltip);
     ui_row_end();
   ui_screen_end();
+  ui_setoffset(0, 0);
 }
 #undef self 

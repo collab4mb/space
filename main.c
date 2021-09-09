@@ -207,7 +207,7 @@ static int cam_ent_cmp(const void *av, const void *bv) {
 #define OFFSCREEN_SAMPLE_COUNT (4)
 #define STATE_MAX_ENTS (1 << 12)
 #define BLUR_PASSES (4)
-typedef struct {
+typedef struct State {
   bool paused;
   float pause_anim;
   const char *pause_message;
@@ -236,6 +236,10 @@ typedef struct {
   } blur;
 } State;
 static State *state;
+
+#include "ui.h"
+#include "graphview.h"
+graphview_State test_graph___ = { 0 };
 
 static GenDex get_gendex(Ent *ent) {
   // C pointer arithmetic is weird,
@@ -339,13 +343,11 @@ static void fire_laser(Ent *ent) {
 
 ol_Image gem_image;
 
-#include "ui.h"
 #include "build.h"
 #include "collision.h"
 #include "player.h"
 #include "ai.h"
 #include "savestate.h"
-#include "graphview.h"
 #include "generated_tree.h"
 
 void load_texture(Art art, const char *texture) {
@@ -568,6 +570,8 @@ void init(void) {
 
   ui_init();
   ol_init();
+
+  test_graph___.atlas = ol_load_image("./techtree.png");
 
   /* a pipeline state object */
   sg_pipeline_desc desc = {
@@ -895,9 +899,8 @@ static void frame(void) {
 
   build_draw();
 
-  graphview_State graph = { 0 };
-  treeview_generate_techtree(&graph);
-  graphview_draw(&graph);
+  treeview_generate_techtree(&test_graph___);
+  graphview_draw(&test_graph___);
 
   ui_render();
   for (Ent *ent = 0; (ent = ent_all_iter(ent));)
@@ -969,6 +972,7 @@ static void cleanup(void) {
 }
 
 static void event(const sapp_event *ev) {
+  graphview_process_events(&test_graph___, ev);
   if (ui_event(ev)) return;
   if (!state->paused && build_event(ev)) return;
   switch (ev->type) {
