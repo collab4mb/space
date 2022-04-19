@@ -1,3 +1,6 @@
+# screenshot
+![screenshot](screenshot.png)
+
 # Space Game
 In Space Game, you maneuver a 3D space ship across a 2D plane. Waves of other ships will periodically arrive to attack you. To help ward them off, you can construct walls and other defenses using materials harvested from stray asteroids and defeated enemies.
 
