@@ -141,7 +141,7 @@ typedef struct {
   char textbuf[TEXBUF_SIZE];
   size_t textbuf_offs;
   
-  ui_Command commands[1024];
+  ui_Command commands[2048];
   size_t command_count;
 
   // E.g. nesting limit is 32
@@ -162,9 +162,9 @@ static ui_State _ui_state;
 void ui_init() {
   _ui_state = (ui_State) {
     .fonts = {
-      [ui_Font_Small] =  ol_load_font("./Orbitron-Regular.ttf", 24),
-      [ui_Font_Normal] = ol_load_font("./Orbitron-Regular.ttf", 32),
-      [ui_Font_Big] =    ol_load_font("./Orbitron-Regular.ttf", 40),
+      [ui_Font_Small] =  ol_load_font("./Orbitron-Regular.ttf", 20),
+      [ui_Font_Normal] = ol_load_font("./Orbitron-Regular.ttf", 20),
+      [ui_Font_Big] =    ol_load_font("./Orbitron-Regular.ttf", 20),
     },
     .modulate = vec4(1.0, 1.0, 1.0, 1.0),
     .atlas = ol_load_image("./ui.png"),

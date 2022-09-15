@@ -164,6 +164,7 @@ static void _gv(print_roman)(char *dest, int num) {
     "VI",
     "VII",
     "VIII",
+    "IX",
     "X",
   };
   if (num <= 10) strcpy(dest, literals[num]);
@@ -175,6 +176,7 @@ void gv(draw)(gv(State) *state) {
   _gv(relocate_y)(state);
   _gv(squeeze)(state, &state->nodes[6], &state->nodes[2]);
   ui_freeform(sapp_width(), sapp_height());
+  ui_rect(vec4(0.0, 0.0, 0.0, 0.6f), ui_rel_x(1.0), ui_rel_y(1.0));
   ui_freeform_at(state->scroll_x, state->scroll_y);
   ui_freeform(sapp_width(), sapp_height());
   bool hit = false;
@@ -202,6 +204,8 @@ void gv(draw)(gv(State) *state) {
       }
       ui_screen_anchor_xy(0.5, 0.5);
       ui_image_part(&state->atlas, node->icon_rect);
+      ui_screen_anchor_xy(0.8f, 0.2f);
+      ui_textf(buf);
     ui_screen_end();
   }
   if (!hit)
@@ -213,4 +217,4 @@ void gv(draw)(gv(State) *state) {
 
 #undef gv
 #undef _gv
-#undef MAX_NODES
+#undef MAX_NODE 

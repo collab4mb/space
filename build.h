@@ -1,5 +1,6 @@
 #include "math.h"
 #include <math.h>
+#include <ctype.h>
 
 typedef enum {
   _build_Option_Pillar,
@@ -227,6 +228,25 @@ static bool _build_icon_button(int w, int h, size_t i, bool selected) {
   return pressed;
 }
 
+static char *_build_strlower(const char *s) {
+    char *ns = strdup(s);
+
+    for (int i = 0; ns[i]; ++i) {
+        ns[i] = tolower(ns[i]);
+    }
+
+    return ns;
+}
+
+
+static bool _build_contains_lower(const char *a, const char *b) {
+    char *acpy = _build_strlower(a), *bcpy = _build_strlower(b);
+    bool contains = strstr(acpy, bcpy);
+    free(acpy);
+    free(bcpy);
+    return contains;
+}
+
 static void _build_sidebar() {
   ui_setoffset(_build_interp(-SIDEBAR_SIZE, 0, 1.3f), 0);
   ui_screen(SIDEBAR_SIZE, ui_rel_y(1.0));
@@ -243,7 +263,7 @@ static void _build_sidebar() {
       ui_row(ui_rel_x(1.0), ui_rel_y(1.0));
         for (size_t i = 0; i < _build_Option_COUNT; i += 1) {
           if (_build_state.search.input[0]) {
-            if (strstr((const char*)_build_options[i].name, (const char*)_build_state.search.input) == NULL)
+            if (_build_contains_lower(_build_options[i].name, _build_state.search.input) == false)
               continue;
           }
           ui_margin(10);  

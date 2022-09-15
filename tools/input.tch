@@ -1,8 +1,9 @@
 #|-----------------------
-  Tech tree destcription
+  Tech tree description
   -----------------------|#
 
 ;         --NAME                  --TIER  --TEXTURE
+(/nodedef Jamming-Computers-IX    9       (0 48 48 48))
 (/nodedef Rotating-Barrels-I      1       (0 48 48 48))
 (/nodedef Rotating-Barrels-II     2       (0 48 48 48))
 (/nodedef Rotating-Barrels-III    3       (0 48 48 48))
@@ -32,7 +33,8 @@
     Rotating-Barrels-III))
 
 (/join (Shotgun-II Rotating-Barrels-III)
-  Targeting-Computer-I)
+  (Targeting-Computer-I Jamming-Computers-I))
+
 
 (Magnet-Core-I
   Polarity-Enhancers-I

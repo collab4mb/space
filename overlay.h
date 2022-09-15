@@ -134,15 +134,16 @@ ol_Font ol_load_font(const char *path, int font_size) {
 
   stbtt_pack_context context;
   assert(stbtt_PackBegin(&context, atlas, ATLAS_SIZE, ATLAS_SIZE, ATLAS_SIZE, 1, NULL) && "Failed to load font");
-  stbtt_PackSetOversampling(&context, 2, 2);
+  stbtt_PackSetOversampling(&context, 4, 4);
   assert(stbtt_PackFontRange(&context, ttf_buffer, 0, (float)font.size, 0, 256, font.pc) && "Failed font packing");
   stbtt_PackEnd(&context);
   font.img = ol_image_from_sg(sg_make_image(&(sg_image_desc) {
     .pixel_format = SG_PIXELFORMAT_R8,
     .width = ATLAS_SIZE,
     .height = ATLAS_SIZE,
-    .data.subimage[0][0] = (sg_range){atlas, ATLAS_SIZE*ATLAS_SIZE*sizeof(uint8_t)}
+    .data.subimage[0][0] = (sg_range){atlas, 1024*1024*sizeof(uint8_t)}
   }), ATLAS_SIZE, ATLAS_SIZE);
+
   return font;
 }
 

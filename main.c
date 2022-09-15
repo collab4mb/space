@@ -1,3 +1,4 @@
+//#define ENABLE_TECHTREE
 #define SOKOL_IMPL
 #if defined(_MSC_VER)
 #define SOKOL_D3D11
@@ -829,7 +830,9 @@ static void frame(void) {
   
  
   ui_screen((int)w, (int)h);
-    ui_screen_anchor_xy(0.98f, 0.02f);
+    ui_screen_anchor_xy(0.5f, 0.5f);
+    _ui_text("Hello, folks!");
+    ui_screen_anchor_xy(0.98f, 0.0f);
     ui_column(250, 0);
       ui_healthbar(250, 50, plr_hp, ui_HealthbarShape_Fancy);
 
@@ -899,8 +902,10 @@ static void frame(void) {
 
   build_draw();
 
+#ifdef ENABLE_TECHTREE
   treeview_generate_techtree(&test_graph___);
   graphview_draw(&test_graph___);
+#endif
 
   ui_render();
   for (Ent *ent = 0; (ent = ent_all_iter(ent));)
@@ -972,7 +977,9 @@ static void cleanup(void) {
 }
 
 static void event(const sapp_event *ev) {
+#ifdef ENABLE_TECHTREE
   graphview_process_events(&test_graph___, ev);
+#endif
   if (ui_event(ev)) return;
   if (!state->paused && build_event(ev)) return;
   switch (ev->type) {
