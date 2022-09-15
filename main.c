@@ -1,4 +1,4 @@
-//#define ENABLE_TECHTREE
+#define ENABLE_TECHTREE
 #define SOKOL_IMPL
 #if defined(_MSC_VER)
 #define SOKOL_D3D11

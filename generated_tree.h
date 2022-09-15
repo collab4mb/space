@@ -3,178 +3,170 @@ void treeview_generate_techtree(graphview_State *state) {
   /* root */
   state->nodes[0] = (graphview_Node) {
     .present = true,
-    .first_child = &state->nodes[2],
-  };
-  /* Jamming-Computers-I */
-  state->nodes[1] = (graphview_Node) {
-    .present = true,
-    .icon_rect = { 0, 48, 48, 48 },
-    .tier = 9,
-    .name = "Jamming-Computers-I",
+    .first_child = &state->nodes[1],
   };
   /* Rotating-Barrels-I */
-  state->nodes[2] = (graphview_Node) {
+  state->nodes[1] = (graphview_Node) {
     .present = true,
     .icon_rect = { 0, 48, 48, 48 },
     .tier = 1,
     .name = "Rotating-Barrels-I",
-    .sibling = &state->nodes[7],
-    .first_child = &state->nodes[3],
+    .sibling = &state->nodes[6],
+    .first_child = &state->nodes[2],
   };
   /* Rotating-Barrels-II */
-  state->nodes[3] = (graphview_Node) {
+  state->nodes[2] = (graphview_Node) {
     .present = true,
     .icon_rect = { 0, 48, 48, 48 },
     .tier = 2,
     .name = "Rotating-Barrels-II",
-    .first_child = &state->nodes[5],
+    .first_child = &state->nodes[4],
   };
   /* Rotating-Barrels-III */
-  state->nodes[4] = (graphview_Node) {
+  state->nodes[3] = (graphview_Node) {
     .present = true,
     .icon_rect = { 0, 48, 48, 48 },
     .tier = 3,
     .name = "Rotating-Barrels-III",
   };
   /* Shotgun-I */
-  state->nodes[5] = (graphview_Node) {
+  state->nodes[4] = (graphview_Node) {
     .present = true,
     .icon_rect = { 48, 48, 48, 48 },
     .tier = 1,
     .name = "Shotgun-I",
-    .sibling = &state->nodes[4],
-    .first_child = &state->nodes[6],
+    .sibling = &state->nodes[3],
+    .first_child = &state->nodes[5],
   };
   /* Shotgun-II */
-  state->nodes[6] = (graphview_Node) {
+  state->nodes[5] = (graphview_Node) {
     .present = true,
     .icon_rect = { 48, 48, 48, 48 },
     .tier = 2,
     .name = "Shotgun-II",
   };
   /* Targeting-Computer-I */
-  state->nodes[7] = (graphview_Node) {
+  state->nodes[6] = (graphview_Node) {
     .present = true,
     .icon_rect = { 96, 48, 48, 48 },
     .tier = 1,
     .name = "Targeting-Computer-I",
     .sibling = &state->nodes[8],
-    .first_child = &state->nodes[1],
+    .first_child = &state->nodes[7],
   };
   /* Targeting-Computer-II */
-  state->nodes[8] = (graphview_Node) {
+  state->nodes[7] = (graphview_Node) {
     .present = true,
     .icon_rect = { 96, 48, 48, 48 },
     .tier = 2,
     .name = "Targeting-Computer-II",
-    .sibling = &state->nodes[9],
   };
   /* Magnet-Core-I */
-  state->nodes[9] = (graphview_Node) {
+  state->nodes[8] = (graphview_Node) {
     .present = true,
     .icon_rect = { 144, 48, 48, 48 },
     .tier = 1,
     .name = "Magnet-Core-I",
-    .sibling = &state->nodes[14],
-    .first_child = &state->nodes[12],
+    .sibling = &state->nodes[13],
+    .first_child = &state->nodes[11],
   };
   /* Magnet-Core-II */
-  state->nodes[10] = (graphview_Node) {
+  state->nodes[9] = (graphview_Node) {
     .present = true,
     .icon_rect = { 144, 48, 48, 48 },
     .tier = 2,
     .name = "Magnet-Core-II",
-    .first_child = &state->nodes[13],
+    .first_child = &state->nodes[12],
   };
   /* Magnet-Core-III */
-  state->nodes[11] = (graphview_Node) {
+  state->nodes[10] = (graphview_Node) {
     .present = true,
     .icon_rect = { 144, 48, 48, 48 },
     .tier = 3,
     .name = "Magnet-Core-III",
   };
   /* Polarity-Enhancers-I */
-  state->nodes[12] = (graphview_Node) {
+  state->nodes[11] = (graphview_Node) {
     .present = true,
     .icon_rect = { 192, 48, 48, 48 },
     .tier = 1,
     .name = "Polarity-Enhancers-I",
-    .sibling = &state->nodes[10],
+    .sibling = &state->nodes[9],
   };
   /* Crystal-Midas-I */
-  state->nodes[13] = (graphview_Node) {
+  state->nodes[12] = (graphview_Node) {
     .present = true,
     .icon_rect = { 240, 48, 48, 48 },
     .tier = 1,
     .name = "Crystal-Midas-I",
-    .sibling = &state->nodes[11],
+    .sibling = &state->nodes[10],
   };
   /* Projectile-Payload-I */
-  state->nodes[14] = (graphview_Node) {
+  state->nodes[13] = (graphview_Node) {
     .present = true,
     .icon_rect = { 288, 48, 48, 48 },
     .tier = 1,
     .name = "Projectile-Payload-I",
-    .sibling = &state->nodes[18],
-    .first_child = &state->nodes[15],
+    .sibling = &state->nodes[17],
+    .first_child = &state->nodes[14],
   };
   /* Projectile-Payload-II */
-  state->nodes[15] = (graphview_Node) {
+  state->nodes[14] = (graphview_Node) {
     .present = true,
     .icon_rect = { 288, 48, 48, 48 },
     .tier = 2,
     .name = "Projectile-Payload-II",
-    .first_child = &state->nodes[17],
+    .first_child = &state->nodes[16],
   };
   /* Projectile-Payload-III */
-  state->nodes[16] = (graphview_Node) {
+  state->nodes[15] = (graphview_Node) {
     .present = true,
     .icon_rect = { 288, 48, 48, 48 },
     .tier = 3,
     .name = "Projectile-Payload-III",
   };
   /* Homing-Projectiles-I */
-  state->nodes[17] = (graphview_Node) {
+  state->nodes[16] = (graphview_Node) {
     .present = true,
     .icon_rect = { 336, 48, 48, 48 },
     .tier = 1,
     .name = "Homing-Projectiles-I",
-    .sibling = &state->nodes[16],
+    .sibling = &state->nodes[15],
   };
   /* Builder-I */
-  state->nodes[18] = (graphview_Node) {
+  state->nodes[17] = (graphview_Node) {
     .present = true,
     .icon_rect = { 384, 48, 48, 48 },
     .tier = 1,
     .name = "Builder-I",
-    .first_child = &state->nodes[20],
+    .first_child = &state->nodes[19],
   };
   /* Builder-II */
-  state->nodes[19] = (graphview_Node) {
+  state->nodes[18] = (graphview_Node) {
     .present = true,
     .icon_rect = { 384, 48, 48, 48 },
     .tier = 2,
     .name = "Builder-II",
   };
   /* Forceful-I */
-  state->nodes[20] = (graphview_Node) {
+  state->nodes[19] = (graphview_Node) {
     .present = true,
     .icon_rect = { 432, 48, 48, 48 },
     .tier = 1,
     .name = "Forceful-I",
-    .sibling = &state->nodes[19],
-    .first_child = &state->nodes[21],
+    .sibling = &state->nodes[18],
+    .first_child = &state->nodes[20],
   };
   /* Forceful-II */
-  state->nodes[21] = (graphview_Node) {
+  state->nodes[20] = (graphview_Node) {
     .present = true,
     .icon_rect = { 432, 48, 48, 48 },
     .tier = 2,
     .name = "Forceful-II",
-    .first_child = &state->nodes[22],
+    .first_child = &state->nodes[21],
   };
   /* Bouncy-I */
-  state->nodes[22] = (graphview_Node) {
+  state->nodes[21] = (graphview_Node) {
     .present = true,
     .icon_rect = { 480, 48, 48, 48 },
     .tier = 1,
@@ -182,32 +174,32 @@ void treeview_generate_techtree(graphview_State *state) {
   };
   state->conns[0] = (graphview_Conn) {
     .present = true,
-    .from = &state->nodes[6],
-    .to   = &state->nodes[7],
+    .from = &state->nodes[5],
+    .to   = &state->nodes[6],
   };
   state->conns[1] = (graphview_Conn) {
     .present = true,
-    .from = &state->nodes[4],
-    .to   = &state->nodes[7],
+    .from = &state->nodes[3],
+    .to   = &state->nodes[6],
   };
   state->conns[2] = (graphview_Conn) {
     .present = true,
-    .from = &state->nodes[4],
-    .to   = &state->nodes[14],
+    .from = &state->nodes[3],
+    .to   = &state->nodes[13],
   };
   state->conns[3] = (graphview_Conn) {
     .present = true,
-    .from = &state->nodes[10],
-    .to   = &state->nodes[14],
+    .from = &state->nodes[9],
+    .to   = &state->nodes[13],
   };
   state->conns[4] = (graphview_Conn) {
     .present = true,
-    .from = &state->nodes[19],
-    .to   = &state->nodes[8],
+    .from = &state->nodes[18],
+    .to   = &state->nodes[7],
   };
   state->conns[5] = (graphview_Conn) {
     .present = true,
-    .from = &state->nodes[7],
-    .to   = &state->nodes[8],
+    .from = &state->nodes[6],
+    .to   = &state->nodes[7],
   };
 }
